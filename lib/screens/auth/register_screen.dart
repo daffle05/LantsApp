@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import 'login_screen.dart';
@@ -39,6 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  // REGISTER ACCOUNT.
   Future<void> register() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -61,6 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       isLoading = false;
     });
 
+    // SHOW ERROR MESSAGE.
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -71,17 +74,74 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // SUCCESS MESSAGE BASED ON ACCOUNT TYPE.
     final message = selectedRole == 'personnel'
-        ? 'Registration successful! Your personnel account is pending approval.'
-        : 'Registration successful! You can now login.';
+        ? 'Your personnel account is pending approval.'
+        : 'You can now log in to your account.';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF075E54),
-        duration: const Duration(seconds: 4),
+    // SHOW SUCCESS POP-UP.
+    
+await showDialog(
+  context: context,
+  barrierDismissible: true,
+  builder: (dialogContext) {
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 310,
+          padding: const EdgeInsets.all(25),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.check_circle,
+                color: Color(0xFF16A085),
+                size: 65,
+              ),
+              const SizedBox(height: 15),
+              const Text(
+                'Registration Successful!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF075E54),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A085),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(110, 40),
+                ),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  },
+);
+
+
+    // GO TO LOGIN AFTER THE POP-UP CLOSES.
+    if (!mounted) return;
 
     Navigator.pushReplacement(
       context,
@@ -91,7 +151,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Reusable input decoration.
+  // REUSABLE INPUT DECORATION.
   InputDecoration inputDecoration({
     required String hint,
     required IconData icon,
@@ -135,7 +195,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Reusable field label.
+  // REUSABLE FIELD LABEL.
   Widget fieldLabel(String label) {
     return Align(
       alignment: Alignment.centerLeft,
@@ -150,7 +210,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Account role selection.
+  // ACCOUNT ROLE SELECTION.
   Widget roleCard({
     required String role,
     required String title,
@@ -242,15 +302,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Vessel background.
+          // VESSEL BACKGROUND.
           Positioned.fill(
             child: Image.asset(
-              'assets/images/vessel_background.jpg',
+              'assets/images/Lantsapp.jpg',
               fit: BoxFit.cover,
             ),
           ),
 
-          // Light dark overlay to retain background visibility.
+          // DARK OVERLAY.
           Positioned.fill(
             child: Container(
               color: Colors.black.withOpacity(0.30),
@@ -272,7 +332,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     key: _formKey,
                     child: Column(
                       children: [
-                        // Back button.
+                        // BACK BUTTON.
                         Align(
                           alignment: Alignment.centerLeft,
                           child: IconButton(
@@ -288,7 +348,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: 5),
 
-                        // Transparent information holder.
+                        // TRANSPARENT INFORMATION HOLDER.
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
@@ -313,7 +373,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           child: Column(
                             children: [
-                              // Circular logo.
+                              // CIRCULAR LOGO.
                               Container(
                                 height: 78,
                                 width: 78,

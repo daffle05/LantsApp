@@ -22,7 +22,7 @@ class AuthUser {
       id: int.parse(json['id'].toString()),
       fullName: json['full_name'].toString(),
       email: json['email'].toString(),
-      role: json['role'].toString(),
+      role: json['role'].toString().trim().toLowerCase(),
       status: json['status'].toString(),
     );
   }
@@ -63,6 +63,8 @@ class AuthService {
       final Map<String, dynamic> data =
           jsonDecode(response.body) as Map<String, dynamic>;
 
+          print('LOGIN API RESPONSE: ${response.body}');
+
       if (response.statusCode == 200 && data['success'] == true) {
         return null;
       }
@@ -99,11 +101,18 @@ class AuthService {
       final Map<String, dynamic> data =
           jsonDecode(response.body) as Map<String, dynamic>;
 
-      if (response.statusCode == 200 && data['success'] == true) {
-        return AuthUser.fromJson(
-          data['user'] as Map<String, dynamic>,
-        );
-      }
+      print('SERVER RESPONSE: ${response.body}');
+      print('HTTP STATUS: ${response.statusCode}');
+
+if (response.statusCode == 200 && data['success'] == true) {
+  final user = AuthUser.fromJson(
+    data['user'] as Map<String, dynamic>,
+  );
+
+  print('ROLE RECEIVED BY FLUTTER: [${user.role}]');
+
+  return user;
+}
 
       lastError = data['message']?.toString() ??
           'Invalid email or password.';

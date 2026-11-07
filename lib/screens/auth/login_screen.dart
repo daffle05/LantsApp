@@ -1,8 +1,10 @@
 
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../admin/admin_dashboard.dart';
 import '../passenger/passenger_dashboard.dart';
 import '../personnel/personnel_dashboard.dart';
+import '../personnel/personnel_requirements_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -66,26 +68,56 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     // Redirect based on account role.
-    if (user.role == 'passenger') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PassengerDashboard(),
+    debugPrint('LOGIN ROLE FROM DATABASE: [${user.role}]');
+    switch (user.role.trim().toLowerCase()) {
+      case 'passenger':
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PassengerDashboard(),
+          ),
+        );
+        break;
+
+      case 'personnel':
+  if (user.status.toLowerCase() == 'pending') {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PersonnelRequirementsScreen(
+          personnelId: user.id,
+          fullName: user.fullName,
         ),
-      );
-    } else if (user.role == 'personnel') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PersonnelDashboard(),
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid account role.'),
-        ),
-      );
+      ),
+    );
+  } else if (user.status.toLowerCase() == 'active') {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PersonnelDashboard(),
+      ),
+    );
+  }
+  break;
+
+      case 'admin':
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (context) => AdminDashboard(
+        adminId: user.id,
+      ),
+    ),
+  );
+  break;
+
+      default:
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Invalid account role: [${user.role}]'),
+      duration: const Duration(seconds: 10),
+    ),
+  );
     }
   }
 
@@ -100,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
           // Vessel background image.
           Positioned.fill(
             child: Image.asset(
-              'assets/images/vessel_background.jpg',
+              'assets/images/Lantsapp.jpg',
               fit: BoxFit.cover,
             ),
           ),
