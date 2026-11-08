@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'boat_map_screen.dart';
 
 class PassengerDashboard extends StatefulWidget {
   const PassengerDashboard({super.key});
@@ -26,74 +27,140 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
         child: IndexedStack(
           index: selectedIndex,
           children: [
-            homePage(),
-            simplePage('Boat Routes', Icons.map_outlined),
-            simplePage('Advisories', Icons.campaign_outlined),
-            simplePage('My Profile', Icons.person_outline),
-          ],
+              homePage(),
+              const BoatMapScreen(),
+              simplePage('Search', Icons.search_rounded),
+              simplePage('Advisories', Icons.campaign_outlined),
+              simplePage('My Profile', Icons.person_outline),
+            ],
         ),
       ),
       bottomNavigationBar: bottomNavigation(),
     );
   }
 
-  // FLOATING BOTTOM NAVIGATION
+  // FIVE-ITEM FLOATING BOTTOM NAVIGATION
   Widget bottomNavigation() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 8, 20, 15),
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      decoration: BoxDecoration(
-        color: deepTeal,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: deepTeal.withOpacity(0.20),
-            blurRadius: 18,
-            offset: const Offset(0, 7),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      color: deepTeal,
+      padding: const EdgeInsets.fromLTRB(15, 25, 15, 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          navItem(Icons.home_outlined, 'Home', 0),
-          navItem(Icons.map_outlined, 'Routes', 1),
-          navItem(Icons.campaign_outlined, 'Advisories', 2),
-          navItem(Icons.person_outline, 'Profile', 3),
+          Container(
+            height: 76,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.22),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                navItem(Icons.home_rounded, 'Home', 0),
+                navItem(Icons.map_rounded, 'Routes', 1),
+                navItem(Icons.search_rounded, 'Search', 2),
+                navItem(Icons.campaign_rounded, 'Advisories', 3),
+                navItem(Icons.person_rounded, 'Profile', 4),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // BOTTOM GESTURE INDICATOR
+          Container(
+            width: 110,
+            height: 5,
+            decoration: BoxDecoration(
+              color: mint,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
         ],
       ),
     );
   }
 
+  // INDIVIDUAL NAVIGATION ITEM
   Widget navItem(IconData icon, String label, int index) {
-    final isSelected = selectedIndex == index;
+    final bool isSelected = selectedIndex == index;
 
     return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () {
           setState(() {
             selectedIndex = index;
           });
         },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 7),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: SizedBox(
+          height: 76,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
             children: [
-              Icon(
-                icon,
-                size: 25,
-                color: isSelected ? mint : Colors.white70,
+              // ACTIVE RAISED CIRCLE
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                top: isSelected ? -20 : 8,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  height: isSelected ? 48 : 38,
+                  width: isSelected ? 48 : 38,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? oceanTeal
+                        : Colors.transparent,
+                    shape: BoxShape.circle,
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: oceanTeal.withOpacity(0.30),
+                              blurRadius: 12,
+                              offset: const Offset(0, 5),
+                            ),
+                          ]
+                        : [],
+                  ),
+                  child: Icon(
+                    icon,
+                    size: isSelected ? 25 : 23,
+                    color: isSelected
+                        ? Colors.white
+                        : const Color(0xFF68737D),
+                  ),
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight:
-                      isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? mint : Colors.white70,
+
+              // NAVIGATION LABEL
+              Positioned(
+                bottom: 10,
+                left: 0,
+                right: 0,
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    fontSize: isSelected ? 10 : 9,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.w500,
+                    color: isSelected
+                        ? deepTeal
+                        : const Color(0xFF9AA3AA),
+                  ),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
             ],
@@ -166,7 +233,7 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
                 child: IconButton(
                   onPressed: () {
                     setState(() {
-                      selectedIndex = 2;
+                      selectedIndex = 3;
                     });
                   },
                   icon: const Icon(
@@ -298,21 +365,21 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
                 'Check latest updates',
                 Icons.campaign_outlined,
                 const Color(0xFF269B78),
-                () => setState(() => selectedIndex = 2),
+                () => setState(() => selectedIndex = 3),
               ),
               shortcutCard(
                 'Schedules',
                 'View boat schedules',
                 Icons.calendar_month_outlined,
                 oceanTeal,
-                () {},
+                () => setState(() => selectedIndex = 1),
               ),
               shortcutCard(
                 'My Profile',
                 'Manage your account',
                 Icons.person_outline_rounded,
                 const Color(0xFF269B78),
-                () => setState(() => selectedIndex = 3),
+                () => setState(() => selectedIndex = 4),
               ),
             ],
           ),
@@ -857,7 +924,7 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
         children: [
           Container(
             padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: lightMint,
               shape: BoxShape.circle,
             ),
