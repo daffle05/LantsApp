@@ -103,7 +103,9 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => PersonnelDashboard(),
+              builder: (context) => PersonnelDashboard(
+                fullName: user.fullName,
+              ),
             ),
           );
         } else {

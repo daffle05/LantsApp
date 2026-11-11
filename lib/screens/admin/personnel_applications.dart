@@ -1,7 +1,10 @@
 
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
+import 'personnel_application_details.dart';
 
 class PersonnelApplications extends StatefulWidget {
   final int adminId;
@@ -25,15 +28,12 @@ class _PersonnelApplicationsState extends State<PersonnelApplications> {
   bool isLoading = true;
   String? errorMessage;
 
-  final Set<int> processingIds = {};
-
   @override
   void initState() {
     super.initState();
     fetchPersonnel();
   }
 
-  // GET PENDING PERSONNEL
   Future<void> fetchPersonnel() async {
     setState(() {
       isLoading = true;
@@ -65,133 +65,29 @@ class _PersonnelApplicationsState extends State<PersonnelApplications> {
     }
   }
 
-  // CONFIRM APPROVAL OR REJECTION
-  Future<void> confirmAction(
-    Map<String, dynamic> person,
-    String status,
-  ) async {
-    final name = person['full_name']?.toString() ?? 'this applicant';
-
-    final action = status == 'active' ? 'approve' : 'reject';
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(
-            status == 'active'
-                ? 'Approve Personnel?'
-                : 'Reject Personnel?',
-          ),
-          content: Text(
-            'Are you sure you want to $action $name?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    status == 'active' ? Colors.green : Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(
-                status == 'active' ? 'Approve' : 'Reject',
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed == true) {
-      await updatePersonnelStatus(person, status);
-    }
-  }
-
-  // UPDATE PERSONNEL STATUS
-  Future<void> updatePersonnelStatus(
-    Map<String, dynamic> person,
-    String status,
-  ) async {
+  void openApplication(Map<String, dynamic> person) {
     final int? personnelId = int.tryParse(
       person['id'].toString(),
     );
 
     if (personnelId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid personnel ID.')),
+        const SnackBar(
+          content: Text('Invalid personnel ID.'),
+        ),
       );
       return;
     }
 
-    setState(() {
-      processingIds.add(personnelId);
-    });
-
-    try {
-      final response = await http
-          .post(
-            Uri.parse('${baseUrl}update_personnel_status.php'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode({
-              'admin_id': widget.adminId,
-              'personnel_id': personnelId,
-              'status': status,
-            }),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data['success'] == true) {
-        if (!mounted) return;
-
-        setState(() {
-          personnel.removeWhere(
-            (item) => item['id'].toString() == personnelId.toString(),
-          );
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              status == 'active'
-                  ? 'Personnel approved successfully!'
-                  : 'Personnel rejected successfully!',
-            ),
-            backgroundColor: status == 'active'
-                ? Colors.green
-                : Colors.red,
-          ),
-        );
-      } else {
-        throw Exception(
-          data['message'] ?? 'Unable to update personnel status.',
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Update failed: $e'),
-          backgroundColor: Colors.red,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PersonnelApplicationDetails(
+          adminId: widget.adminId,
+          personnelId: personnelId,
         ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          processingIds.remove(personnelId);
-        });
-      }
-    }
+      ),
+    );
   }
 
   @override
@@ -220,7 +116,9 @@ class _PersonnelApplicationsState extends State<PersonnelApplications> {
   Widget _buildBody() {
     if (isLoading) {
       return const Center(
-        child: CircularProgressIndicator(color: primaryColor),
+        child: CircularProgressIndicator(
+          color: primaryColor,
+        ),
       );
     }
 
@@ -291,13 +189,6 @@ class _PersonnelApplicationsState extends State<PersonnelApplications> {
         ...personnel.map((item) {
           final person = Map<String, dynamic>.from(item);
 
-          final int? personId = int.tryParse(
-            person['id'].toString(),
-          );
-
-          final bool isProcessing =
-              personId != null && processingIds.contains(personId);
-
           return Card(
             color: Colors.white,
             elevation: 1,
@@ -335,8 +226,11 @@ class _PersonnelApplicationsState extends State<PersonnelApplications> {
                           ),
                           const SizedBox(height: 5),
                           const Text(
-                            'Status: Pending',
-                            style: TextStyle(color: Colors.orange),
+                            'Status: Pending Review',
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -345,55 +239,21 @@ class _PersonnelApplicationsState extends State<PersonnelApplications> {
 
                   const Divider(),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: isProcessing
-                              ? null
-                              : () => confirmAction(
-                                    person,
-                                    'rejected',
-                                  ),
-                          icon: const Icon(
-                            Icons.close,
-                            size: 18,
-                          ),
-                          label: const Text('Reject'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            side: const BorderSide(color: Colors.red),
-                          ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => openApplication(person),
+                      icon: const Icon(Icons.visibility_outlined),
+                      label: const Text('View Application'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 13,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: isProcessing
-                              ? null
-                              : () => confirmAction(
-                                    person,
-                                    'active',
-                                  ),
-                          icon: const Icon(
-                            Icons.check,
-                            size: 18,
-                          ),
-                          label: const Text('Approve'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  if (isProcessing)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 10),
-                      child: LinearProgressIndicator(),
                     ),
+                  ),
                 ],
               ),
             ),
