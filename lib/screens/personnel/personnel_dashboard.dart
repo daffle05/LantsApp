@@ -1,7 +1,8 @@
+
 import 'package:flutter/material.dart';
 import '../auth/login_screen.dart';
 
-class PersonnelDashboard extends StatelessWidget {
+class PersonnelDashboard extends StatefulWidget {
   final String fullName;
 
   const PersonnelDashboard({
@@ -9,11 +10,21 @@ class PersonnelDashboard extends StatelessWidget {
     required this.fullName,
   });
 
+  @override
+  State<PersonnelDashboard> createState() =>
+      _PersonnelDashboardState();
+}
+
+class _PersonnelDashboardState extends State<PersonnelDashboard> {
   static const Color deepOcean = Color(0xFF073B4C);
   static const Color oceanTeal = Color(0xFF0B7285);
   static const Color mint = Color(0xFF80EDC7);
   static const Color lightMint = Color(0xFFCAF0E3);
   static const Color backgroundColor = Color(0xFFF7FBFC);
+
+  int selectedIndex = 0;
+
+  String get fullName => widget.fullName;
 
   String get firstInitial {
     final name = fullName.trim();
@@ -24,160 +35,370 @@ class PersonnelDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 15, 16, 25),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // PERSONNEL PROFILE
-              profileHeader(context),
 
-              const SizedBox(height: 22),
+      body: IndexedStack(
+        index: selectedIndex,
+        children: [
+          _buildHome(context),
 
-              // WELCOME BANNER
-              welcomeBanner(),
+          _buildNavigationPage(
+            'Manage Vessels',
+            'Add and manage your registered vessel details.',
+            Icons.directions_boat_filled,
+          ),
 
-              const SizedBox(height: 28),
+          _buildNavigationPage(
+            'Manage Schedules',
+            'Set trips and departure times for your vessels.',
+            Icons.calendar_month_rounded,
+          ),
 
-              // OPERATIONS HEADER
-              sectionHeader(
-                'Operations',
-                'Manage your vessel activities',
-                centered: true,
-              ),
+          _buildNavigationPage(
+            'My Profile',
+            'View your personnel account information.',
+            Icons.person_rounded,
+          ),
+        ],
+      ),
 
-              const SizedBox(height: 15),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
 
-              // OPERATION CARDS
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 20,
-                mainAxisSpacing: 13,
-                childAspectRatio: 1.70,
-                children: [
-                  // MANAGE VESSELS
-                  featureCard(
+  // HOME DASHBOARD
+  Widget _buildHome(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 15, 16, 25),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // PERSONNEL PROFILE
+            profileHeader(context),
+
+            const SizedBox(height: 22),
+
+            // WELCOME BANNER
+            welcomeBanner(),
+
+            const SizedBox(height: 28),
+
+            // OPERATIONS HEADER
+            sectionHeader(
+              'Operations',
+              'Manage your vessel activities',
+              centered: true,
+            ),
+
+            const SizedBox(height: 15),
+
+            // OPERATION CARDS
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 20,
+              mainAxisSpacing: 13,
+              childAspectRatio: 1.70,
+              children: [
+                // MANAGE VESSELS
+                featureCard(
+                  'Manage Vessels',
+                  'Add and manage vessel details',
+                  Icons.directions_boat_filled,
+                  oceanTeal,
+                  () => showFeatureMessage(
+                    context,
                     'Manage Vessels',
-                    'Add and manage vessel details',
-                    Icons.directions_boat_filled,
-                    oceanTeal,
-                    () => showFeatureMessage(
-                      context,
-                      'Manage Vessels',
-                    ),
-                    imagePath: 'assets/images/1.jpg',
                   ),
-
-                  // MANAGE SCHEDULES
-                  featureCard(
-                    'Manage Schedules',
-                    'Set trips and departure times',
-                    Icons.calendar_month_rounded,
-                    const Color(0xFF269B78),
-                    () => showFeatureMessage(
-                      context,
-                      'Manage Schedules',
-                    ),
-                    imagePath: 'assets/images/2.jpg',
-                  ),
-
-                  // UPDATE TRIP STATUS
-                  featureCard(
-                    'Update Trip Status',
-                    'Update current trip operations',
-                    Icons.sync_alt_rounded,
-                    const Color(0xFFE3A23B),
-                    () => showFeatureMessage(
-                      context,
-                      'Update Trip Status',
-                    ),
-                    imagePath: 'assets/images/3.jpg',
-                  ),
-
-                  // PUBLISH ADVISORIES
-                  featureCard(
-                    'Publish Advisories',
-                    'Send important passenger updates',
-                    Icons.campaign_rounded,
-                    const Color(0xFF6376C5),
-                    () => showFeatureMessage(
-                      context,
-                      'Publish Advisories',
-                    ),
-                    imagePath: 'assets/images/4.jpg',
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 13),
-
-              // GIS CARD
-              featureCard(
-                'GIS & Vessel Tracking',
-                'Manage vessel locations and route information',
-                Icons.map_rounded,
-                oceanTeal,
-                () => showFeatureMessage(
-                  context,
-                  'GIS & Vessel Tracking',
+                  imagePath: 'assets/images/1.jpg',
                 ),
-                horizontal: true,
-              ),
 
-              const SizedBox(height: 30),
-
-              // PASSENGER UPDATES
-              sectionHeader(
-                'Passenger Updates',
-                'Recent information shared with passengers',
-              ),
-
-              const SizedBox(height: 15),
-
-              updateCard(
-                icon: Icons.directions_boat_filled,
-                title: 'Vessel Information',
-                description:
-                    'Updates about registered vessels will appear here.',
-                time: 'No recent updates',
-                color: oceanTeal,
-              ),
-
-              const SizedBox(height: 12),
-
-              updateCard(
-                icon: Icons.calendar_month_rounded,
-                title: 'Schedule Updates',
-                description:
-                    'Published departure times and schedule changes will appear here.',
-                time: 'No recent updates',
-                color: const Color(0xFF269B78),
-              ),
-
-              const SizedBox(height: 12),
-
-              updateCard(
-                icon: Icons.campaign_rounded,
-                title: 'Trip Advisories',
-                description:
-                    'Published announcements and passenger alerts will appear here.',
-                time: 'No recent updates',
-                color: const Color(0xFFE3A23B),
-              ),
-
-              const SizedBox(height: 25),
-
-              // FOOTER
-              Center(
-                child: Text(
-                  'LantsApp • Personnel Portal',
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 12,
+                // MANAGE SCHEDULES
+                featureCard(
+                  'Manage Schedules',
+                  'Set trips and departure times',
+                  Icons.calendar_month_rounded,
+                  const Color(0xFF269B78),
+                  () => showFeatureMessage(
+                    context,
+                    'Manage Schedules',
                   ),
+                  imagePath: 'assets/images/2.jpg',
+                ),
+
+                // UPDATE TRIP STATUS
+                featureCard(
+                  'Update Trip Status',
+                  'Update current trip operations',
+                  Icons.sync_alt_rounded,
+                  const Color(0xFFE3A23B),
+                  () => showFeatureMessage(
+                    context,
+                    'Update Trip Status',
+                  ),
+                  imagePath: 'assets/images/3.jpg',
+                ),
+
+                // PUBLISH ADVISORIES
+                featureCard(
+                  'Publish Advisories',
+                  'Send important passenger updates',
+                  Icons.campaign_rounded,
+                  const Color(0xFF6376C5),
+                  () => showFeatureMessage(
+                    context,
+                    'Publish Advisories',
+                  ),
+                  imagePath: 'assets/images/4.jpg',
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 13),
+
+            // GIS CARD
+            featureCard(
+              'GIS & Vessel Tracking',
+              'Manage vessel locations and route information',
+              Icons.map_rounded,
+              oceanTeal,
+              () => showFeatureMessage(
+                context,
+                'GIS & Vessel Tracking',
+              ),
+              horizontal: true,
+            ),
+
+            const SizedBox(height: 30),
+
+            // PASSENGER UPDATES
+            sectionHeader(
+              'Passenger Updates',
+              'Recent information shared with passengers',
+            ),
+
+            const SizedBox(height: 15),
+
+            updateCard(
+              icon: Icons.directions_boat_filled,
+              title: 'Vessel Information',
+              description:
+                  'Updates about registered vessels will appear here.',
+              time: 'No recent updates',
+              color: oceanTeal,
+            ),
+
+            const SizedBox(height: 12),
+
+            updateCard(
+              icon: Icons.calendar_month_rounded,
+              title: 'Schedule Updates',
+              description:
+                  'Published departure times and schedule changes will appear here.',
+              time: 'No recent updates',
+              color: const Color(0xFF269B78),
+            ),
+
+            const SizedBox(height: 12),
+
+            updateCard(
+              icon: Icons.campaign_rounded,
+              title: 'Trip Advisories',
+              description:
+                  'Published announcements and passenger alerts will appear here.',
+              time: 'No recent updates',
+              color: const Color(0xFFE3A23B),
+            ),
+
+            const SizedBox(height: 25),
+
+            // FOOTER
+            Center(
+              child: Text(
+                'LantsApp • Personnel Portal',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // CUSTOM BOTTOM NAVIGATION BAR
+  Widget _buildBottomNavigationBar() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Container(
+          height: 78,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              _navItem(
+                Icons.home_outlined,
+                Icons.home,
+                'Home',
+                0,
+              ),
+              _navItem(
+                Icons.directions_boat_outlined,
+                Icons.directions_boat,
+                'Vessels',
+                1,
+              ),
+              _navItem(
+                Icons.calendar_month_outlined,
+                Icons.calendar_month,
+                'Schedules',
+                2,
+              ),
+              _navItem(
+                Icons.person_outline,
+                Icons.person,
+                'Profile',
+                3,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // INDIVIDUAL NAVIGATION ITEM
+  Widget _navItem(
+    IconData icon,
+    IconData activeIcon,
+    String label,
+    int index,
+  ) {
+    final bool isSelected = selectedIndex == index;
+
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          setState(() {
+            selectedIndex = index;
+          });
+        },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              width: isSelected ? 44 : 38,
+              height: isSelected ? 44 : 38,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? oceanTeal
+                    : Colors.transparent,
+                shape: BoxShape.circle,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: oceanTeal.withOpacity(0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Icon(
+                isSelected ? activeIcon : icon,
+                color: isSelected
+                    ? Colors.white
+                    : Colors.grey.shade500,
+                size: 22,
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+                color: isSelected
+                    ? deepOcean
+                    : Colors.grey.shade500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // TEMPORARY NAVIGATION PAGES
+  Widget _buildNavigationPage(
+    String title,
+    String subtitle,
+    IconData icon,
+  ) {
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 85,
+                height: 85,
+                decoration: BoxDecoration(
+                  color: mint,
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Icon(
+                  icon,
+                  color: oceanTeal,
+                  size: 42,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.bold,
+                  color: deepOcean,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 13,
+                  height: 1.5,
                 ),
               ),
             ],
@@ -280,6 +501,7 @@ class PersonnelDashboard extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
+
           title: const Text(
             'Confirm Logout',
             style: TextStyle(
@@ -287,9 +509,11 @@ class PersonnelDashboard extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
+
           content: const Text(
             'Are you sure you want to log out?',
           ),
+
           actions: [
             TextButton(
               onPressed: () {
@@ -458,7 +682,7 @@ class PersonnelDashboard extends StatelessWidget {
     bool horizontal = false,
     String? imagePath,
   }) {
-    // ORIGINAL HORIZONTAL DESIGN FOR GIS
+    // HORIZONTAL DESIGN FOR GIS
     if (horizontal) {
       return Material(
         color: Colors.white,

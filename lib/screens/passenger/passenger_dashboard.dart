@@ -6,161 +6,124 @@ class PassengerDashboard extends StatefulWidget {
   const PassengerDashboard({super.key});
 
   @override
-  State<PassengerDashboard> createState() =>
-      _PassengerDashboardState();
+  State<PassengerDashboard> createState() => _PassengerDashboardState();
 }
 
 class _PassengerDashboardState extends State<PassengerDashboard> {
   int selectedIndex = 0;
 
-  static const Color deepTeal = Color(0xFF073B4C);
-  static const Color oceanTeal = Color(0xFF0B7285);
-  static const Color mint = Color(0xFF80EDC7);
-  static const Color lightMint = Color(0xFFCAF0E3);
-  static const Color backgroundColor = Color(0xFFF7FBFC);
+  static const Color sageGreen = Color(0xFFA8C5B5);
+  static const Color oceanTeal = Color(0xFF087EAB);
+  static const Color midnightTeal = Color(0xFF073B40);
+  static const Color pureWhite = Color(0xFFFFFFFF);
+  static const Color iceMint = Color(0xFFDDF4F1);
+  static const Color softBackground = Color(0xFFF5F9F8);
+  static const Color mutedText = Color(0xFF71817F);
+
+  final TextEditingController searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: midnightTeal,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: softBackground,
       body: SafeArea(
         child: IndexedStack(
           index: selectedIndex,
           children: [
-              homePage(),
-              const BoatMapScreen(),
-              simplePage('Search', Icons.search_rounded),
-              simplePage('Advisories', Icons.campaign_outlined),
-              simplePage('My Profile', Icons.person_outline),
-            ],
+            homePage(),
+            const BoatMapScreen(),
+            advisoriesPage(),
+          ],
         ),
       ),
       bottomNavigationBar: bottomNavigation(),
     );
   }
 
-  // FIVE-ITEM FLOATING BOTTOM NAVIGATION
+  // BOTTOM NAVIGATION
+
   Widget bottomNavigation() {
     return Container(
-      color: deepTeal,
-      padding: const EdgeInsets.fromLTRB(15, 25, 15, 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: 76,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.22),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                navItem(Icons.home_rounded, 'Home', 0),
-                navItem(Icons.map_rounded, 'Routes', 1),
-                navItem(Icons.search_rounded, 'Search', 2),
-                navItem(Icons.campaign_rounded, 'Advisories', 3),
-                navItem(Icons.person_rounded, 'Profile', 4),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // BOTTOM GESTURE INDICATOR
-          Container(
-            width: 110,
-            height: 5,
-            decoration: BoxDecoration(
-              color: mint,
-              borderRadius: BorderRadius.circular(20),
-            ),
+      margin: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: pureWhite,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: midnightTeal.withOpacity(0.13),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
           ),
         ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            navItem(Icons.home_rounded, 'Home', 0),
+            navItem(Icons.map_rounded, 'Routes', 1),
+            navItem(Icons.campaign_rounded, 'Advisories', 2),
+          ],
+        ),
       ),
     );
   }
 
-  // INDIVIDUAL NAVIGATION ITEM
   Widget navItem(IconData icon, String label, int index) {
     final bool isSelected = selectedIndex == index;
 
     return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
         onTap: () {
           setState(() {
             selectedIndex = index;
           });
         },
-        child: SizedBox(
-          height: 76,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // ACTIVE RAISED CIRCLE
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOutCubic,
-                top: isSelected ? -20 : 8,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutCubic,
-                  height: isSelected ? 48 : 38,
-                  width: isSelected ? 48 : 38,
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? oceanTeal
-                        : Colors.transparent,
-                    shape: BoxShape.circle,
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: oceanTeal.withOpacity(0.30),
-                              blurRadius: 12,
-                              offset: const Offset(0, 5),
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: Icon(
-                    icon,
-                    size: isSelected ? 25 : 23,
-                    color: isSelected
-                        ? Colors.white
-                        : const Color(0xFF68737D),
-                  ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                height: 43,
+                width: 52,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isSelected ? midnightTeal : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 23,
+                  color: isSelected ? pureWhite : mutedText,
                 ),
               ),
-
-              // NAVIGATION LABEL
-              Positioned(
-                bottom: 10,
-                left: 0,
-                right: 0,
-                child: AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 200),
-                  style: TextStyle(
-                    fontSize: isSelected ? 10 : 9,
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.w500,
-                    color: isSelected
-                        ? deepTeal
-                        : const Color(0xFF9AA3AA),
-                  ),
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight:
+                      isSelected ? FontWeight.w800 : FontWeight.w500,
+                  color: isSelected ? midnightTeal : mutedText,
                 ),
               ),
             ],
@@ -170,179 +133,59 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
     );
   }
 
-  // PASSENGER HOME PAGE
+  // HOME PAGE
+
   Widget homePage() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 25),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // HEADER
-          Row(
-            children: [
-              Container(
-                height: 48,
-                width: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [oceanTeal, deepTeal],
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: const Icon(
-                  Icons.directions_boat_filled,
-                  color: Colors.white,
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'LantsApp',
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.bold,
-                        color: deepTeal,
-                      ),
-                    ),
-                    Text(
-                      'Your Sea Travel Companion',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: oceanTeal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: deepTeal.withOpacity(0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: IconButton(
-                  onPressed: () {
-                    setState(() {
-                      selectedIndex = 3;
-                    });
-                  },
-                  icon: const Icon(
-                    Icons.notifications_none_rounded,
-                    color: deepTeal,
-                    size: 27,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          header(),
+          const SizedBox(height: 27),
 
-          const SizedBox(height: 30),
-
-          // WELCOME
           const Text(
-            'Hello, Passenger!',
+            'Your Journey,',
             style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: deepTeal,
+              color: midnightTeal,
+              fontSize: 28,
+              height: 1.1,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 7),
           const Text(
-            'Plan your sea journey with confidence.',
+            'Made Easier.',
             style: TextStyle(
-              color: Colors.black54,
-              fontSize: 15,
+              color: oceanTeal,
+              fontSize: 28,
+              height: 1.2,
+              fontWeight: FontWeight.w800,
             ),
           ),
 
-          const SizedBox(height: 23),
+          const SizedBox(height: 9),
 
-          // TRIP INFORMATION BANNER
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(21),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [oceanTeal, deepTeal],
-              ),
-              borderRadius: BorderRadius.circular(23),
-              boxShadow: [
-                BoxShadow(
-                  color: deepTeal.withOpacity(0.18),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.directions_boat_filled,
-                        color: mint,
-                        size: 25,
-                      ),
-                    ),
-                    const SizedBox(width: 11),
-                    const Text(
-                      'TRIP INFORMATION',
-                      style: TextStyle(
-                        color: mint,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Check Before You Travel!',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Stay updated with boat schedules, trip statuses, '
-                  'and important announcements before going to the port.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                ),
-              ],
+          const Text(
+            'Find vessels, check schedules, and stay updated before you travel.',
+            style: TextStyle(
+              color: mutedText,
+              fontSize: 14,
+              height: 1.5,
             ),
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
 
-          // QUICK ACCESS GRID
-          sectionTitle('Explore LantsApp'),
+          searchBar(),
+
+          const SizedBox(height: 22),
+
+          tripInformationBanner(),
+
+          const SizedBox(height: 27),
+
+          sectionHeading('Explore LantsApp'),
+
           const SizedBox(height: 14),
 
           GridView.count(
@@ -351,433 +194,220 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
             physics: const NeverScrollableScrollPhysics(),
             crossAxisSpacing: 13,
             mainAxisSpacing: 13,
-            childAspectRatio: 1.65,
+            childAspectRatio: 1.42,
             children: [
               shortcutCard(
-                'Boat Routes',
-                'Explore travel routes',
-                Icons.map_outlined,
-                oceanTeal,
-                () => setState(() => selectedIndex = 1),
-              ),
-              shortcutCard(
-                'Trip Advisories',
-                'Check latest updates',
-                Icons.campaign_outlined,
-                const Color(0xFF269B78),
-                () => setState(() => selectedIndex = 3),
+                'Register Vessels',
+                'Browse registered passenger boats',
+                Icons.directions_boat_filled_rounded,
+                () => showMessage(
+                  'Vessel directory will be available here.',
+                ),
               ),
               shortcutCard(
                 'Schedules',
-                'View boat schedules',
-                Icons.calendar_month_outlined,
-                oceanTeal,
+                'Check passenger boat schedules',
+                Icons.calendar_month_rounded,
                 () => setState(() => selectedIndex = 1),
               ),
               shortcutCard(
-                'My Profile',
-                'Manage your account',
-                Icons.person_outline_rounded,
-                const Color(0xFF269B78),
-                () => setState(() => selectedIndex = 4),
+                'No-Trip Vessels',
+                'View vessels with no scheduled trips',
+                Icons.event_busy_rounded,
+                () => setState(() => selectedIndex = 2),
+              ),
+              shortcutCard(
+                'Fare Monitoring',
+                'Check passenger fare information',
+                Icons.payments_outlined,
+                () => showMessage(
+                  'Fare monitoring will be available here.',
+                ),
               ),
             ],
           ),
 
           const SizedBox(height: 28),
 
-          // TRIP STATUS
-          sectionTitle('Trip Status Overview'),
-          const SizedBox(height: 14),
+          sectionHeading('Explore Boat Routes'),
 
-          Row(
-            children: [
-              Expanded(
-                child: statusCard(
-                  'Available',
-                  '5',
-                  const Color(0xFF269B78),
-                  Icons.check_circle_outline_rounded,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: statusCard(
-                  'Delayed',
-                  '2',
-                  const Color(0xFFE3A23B),
-                  Icons.access_time_rounded,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: statusCard(
-                  'Cancelled',
-                  '1',
-                  const Color(0xFFD65D65),
-                  Icons.cancel_outlined,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 29),
-
-          // SCHEDULES
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              sectionTitle('Upcoming Schedules'),
-              TextButton(
-                onPressed: () => setState(() => selectedIndex = 1),
-                child: const Text(
-                  'See All',
-                  style: TextStyle(
-                    color: oceanTeal,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          scheduleCard(
-            'MV Island Express',
-            'Port A',
-            'Port B',
-            '08:00 AM',
-            'Available',
-            const Color(0xFF269B78),
-          ),
           const SizedBox(height: 13),
-          scheduleCard(
-            'MV Sea Traveler',
-            'Port A',
-            'Port C',
-            '10:30 AM',
-            'Delayed',
-            const Color(0xFFE3A23B),
-          ),
 
-          const SizedBox(height: 29),
+          routePreview(),
 
-          // ROUTE MAP
-          sectionTitle('Explore Boat Routes'),
-          const SizedBox(height: 14),
+          const SizedBox(height: 28),
 
-          Container(
-            height: 175,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: lightMint.withOpacity(0.55),
-              borderRadius: BorderRadius.circular(21),
-              border: Border.all(
-                color: mint.withOpacity(0.7),
-              ),
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: 20,
-                  left: 35,
-                  child: Icon(
-                    Icons.location_on,
-                    color: oceanTeal.withOpacity(0.85),
-                    size: 33,
-                  ),
-                ),
-                Positioned(
-                  bottom: 28,
-                  right: 45,
-                  child: Icon(
-                    Icons.location_on,
-                    color: deepTeal.withOpacity(0.85),
-                    size: 33,
-                  ),
-                ),
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.map_outlined,
-                        color: deepTeal,
-                        size: 43,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Boat Route Map',
-                        style: TextStyle(
-                          color: deepTeal,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Explore ports and passenger boat routes',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Positioned.fill(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(21),
-                      onTap: () => setState(() => selectedIndex = 1),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          sectionHeading('Latest Advisories'),
 
-          const SizedBox(height: 29),
+          const SizedBox(height: 13),
 
-          // ADVISORIES
-          sectionTitle('Latest Advisories'),
-          const SizedBox(height: 14),
-
-          Container(
-            padding: const EdgeInsets.all(17),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(19),
-              border: Border.all(
-                color: const Color(0xFFE7C77B).withOpacity(0.7),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: deepTeal.withOpacity(0.05),
-                  blurRadius: 13,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF4D8),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: const Icon(
-                    Icons.warning_amber_rounded,
-                    color: Color(0xFFB98220),
-                    size: 27,
-                  ),
-                ),
-                const SizedBox(width: 13),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Weather Advisory',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: deepTeal,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        'Please check the latest weather conditions '
-                        'before traveling.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
+          advisoryPreview(),
         ],
       ),
     );
   }
 
-  // SECTION TITLE
-  Widget sectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 19,
-        fontWeight: FontWeight.bold,
-        color: deepTeal,
-      ),
-    );
-  }
+  // HEADER
 
-  // QUICK ACCESS CARD
-  Widget shortcutCard(
-    String title,
-    String subtitle,
-    IconData icon,
-    Color iconColor,
-    VoidCallback onTap,
-  ) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(19),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(19),
-        child: Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(19),
-            border: Border.all(
-              color: lightMint.withOpacity(0.8),
+  Widget header() {
+    return Row(
+      children: [
+        ClipOval(
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: Image.asset(
+              'assets/images/lantsapp_logo.jpg',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: midnightTeal,
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.directions_boat_filled_rounded,
+                    color: pureWhite,
+                    size: 27,
+                  ),
+                );
+              },
             ),
-            boxShadow: [
-              BoxShadow(
-                color: deepTeal.withOpacity(0.045),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-          child: Row(
+        ),
+
+        const SizedBox(width: 11),
+
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                height: 42,
-                width: 42,
-                decoration: BoxDecoration(
-                  color: lightMint.withOpacity(0.65),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 24,
+              Text(
+                'LantsApp',
+                style: TextStyle(
+                  color: midnightTeal,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: deepTeal,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ],
+              Text(
+                'Your Sea Travel Companion',
+                style: TextStyle(
+                  color: oceanTeal,
+                  fontSize: 12,
                 ),
               ),
             ],
           ),
         ),
-      ),
+
+        IconButton(
+          tooltip: 'Notifications',
+          onPressed: () {
+            setState(() => selectedIndex = 2);
+          },
+          icon: const Icon(
+            Icons.notifications_none_rounded,
+            color: midnightTeal,
+            size: 26,
+          ),
+        ),
+
+        const SizedBox(width: 3),
+
+        InkWell(
+          borderRadius: BorderRadius.circular(30),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PassengerProfilePage(),
+              ),
+            );
+          },
+          child: Container(
+            width: 43,
+            height: 43,
+            decoration: const BoxDecoration(
+              color: iceMint,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.person_rounded,
+              color: midnightTeal,
+              size: 25,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  // STATUS CARD
-  Widget statusCard(
-    String title,
-    String count,
-    Color color,
-    IconData icon,
-  ) {
+  // SEARCH BAR
+
+  Widget searchBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        vertical: 16,
-        horizontal: 5,
-      ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: pureWhite,
         borderRadius: BorderRadius.circular(17),
         border: Border.all(
-          color: lightMint.withOpacity(0.7),
+          color: const Color(0xFFE1ECE8),
         ),
         boxShadow: [
           BoxShadow(
-            color: deepTeal.withOpacity(0.05),
+            color: midnightTeal.withOpacity(0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 27),
-          const SizedBox(height: 9),
-          Text(
-            count,
-            style: const TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.bold,
-              color: deepTeal,
+      child: TextField(
+        controller: searchController,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (value) {
+          setState(() => selectedIndex = 1);
+        },
+        decoration: InputDecoration(
+          hintText: 'Search vessel or destination...',
+          hintStyle: const TextStyle(
+            color: mutedText,
+            fontSize: 13,
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: oceanTeal,
+          ),
+          suffixIcon: IconButton(
+            onPressed: () => searchController.clear(),
+            icon: const Icon(
+              Icons.close_rounded,
+              color: mutedText,
+              size: 19,
             ),
           ),
-          const SizedBox(height: 3),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.black54,
-            ),
-          ),
-        ],
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        ),
       ),
     );
   }
 
-  // BOAT SCHEDULE CARD
-  Widget scheduleCard(
-    String vessel,
-    String departure,
-    String destination,
-    String time,
-    String status,
-    Color statusColor,
-  ) {
+  // TRIP INFORMATION BANNER
+
+  Widget tripInformationBanner() {
     return Container(
-      padding: const EdgeInsets.all(17),
+      width: double.infinity,
+      padding: const EdgeInsets.all(21),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(
-          color: lightMint.withOpacity(0.7),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [sageGreen, oceanTeal],
         ),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: deepTeal.withOpacity(0.05),
-            blurRadius: 13,
-            offset: const Offset(0, 5),
+            color: oceanTeal.withOpacity(0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -789,166 +419,502 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
               Container(
                 padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color: lightMint.withOpacity(0.7),
+                  color: pureWhite.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
-                  Icons.directions_boat_filled,
-                  color: deepTeal,
-                  size: 22,
+                  Icons.directions_boat_filled_rounded,
+                  color: pureWhite,
+                  size: 24,
                 ),
               ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Text(
-                  vessel,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: deepTeal,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
+              const SizedBox(width: 10),
+              const Text(
+                'TRIP INFORMATION',
+                style: TextStyle(
+                  color: pureWhite,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 19),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'DEPARTURE',
-                      style: TextStyle(
-                        color: Colors.black45,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      departure,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: deepTeal,
-                      ),
-                    ),
-                  ],
-                ),
+
+          const SizedBox(height: 20),
+
+          const Text(
+            'Check Before You Travel!',
+            style: TextStyle(
+              color: pureWhite,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            'Stay informed about boat schedules, trip statuses, and important announcements before going to the port.',
+            style: TextStyle(
+              color: pureWhite.withOpacity(0.92),
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: midnightTeal,
+              backgroundColor: pureWhite,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
               ),
-              const Icon(
-                Icons.arrow_forward_rounded,
-                color: oceanTeal,
-                size: 21,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'DESTINATION',
-                      style: TextStyle(
-                        color: Colors.black45,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      destination,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: deepTeal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text(
-                    'TIME',
-                    style: TextStyle(
-                      color: Colors.black45,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    time,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: deepTeal,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
+            onPressed: () {
+              setState(() => selectedIndex = 2);
+            },
+            icon: const Icon(
+              Icons.campaign_outlined,
+              size: 18,
+            ),
+            label: const Text(
+              'View advisories',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // OTHER PASSENGER PAGES (TEMPORARY PLACEHOLDERS)
-  Widget simplePage(String title, IconData icon) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  // SECTION HEADING
+
+  Widget sectionHeading(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: midnightTeal,
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+
+  // SHORTCUT CARDS
+  // ClipOval forces the icon background to be circular.
+
+  Widget shortcutCard(
+    String title,
+    String subtitle,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: midnightTeal,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipOval(
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  color: iceMint,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    icon,
+                    size: 24,
+                    color: midnightTeal,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: pureWhite,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: pureWhite.withOpacity(0.76),
+                  fontSize: 10,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ROUTE PREVIEW
+
+  Widget routePreview() {
+    return Material(
+      color: iceMint,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          setState(() => selectedIndex = 1);
+        },
+        child: SizedBox(
+          height: 155,
+          width: double.infinity,
+          child: Stack(
+            children: [
+              Positioned(
+                top: 18,
+                left: 28,
+                child: Icon(
+                  Icons.location_on_rounded,
+                  color: oceanTeal.withOpacity(0.85),
+                  size: 32,
+                ),
+              ),
+              Positioned(
+                bottom: 20,
+                right: 35,
+                child: Icon(
+                  Icons.location_on_rounded,
+                  color: midnightTeal.withOpacity(0.9),
+                  size: 32,
+                ),
+              ),
+              const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.map_outlined,
+                      color: midnightTeal,
+                      size: 39,
+                    ),
+                    SizedBox(height: 7),
+                    Text(
+                      'Explore Boat Routes',
+                      style: TextStyle(
+                        color: midnightTeal,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'View ports and passenger boat routes',
+                      style: TextStyle(
+                        color: mutedText,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ADVISORY PREVIEW
+
+  Widget advisoryPreview() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: pureWhite,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFFE8E6D7),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(22),
-            decoration: const BoxDecoration(
-              color: lightMint,
-              shape: BoxShape.circle,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3D8),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              size: 55,
-              color: oceanTeal,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: deepTeal,
+            child: const Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFFAD781C),
+              size: 25,
             ),
           ),
-          const SizedBox(height: 8),
+
+          const SizedBox(width: 12),
+
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Weather Advisory',
+                  style: TextStyle(
+                    color: midnightTeal,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Please check the latest weather conditions before traveling.',
+                  style: TextStyle(
+                    color: mutedText,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ADVISORIES PAGE
+
+  Widget advisoriesPage() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           const Text(
-            'We will build this page next.',
+            'Trip Advisories',
             style: TextStyle(
-              color: Colors.black54,
-              fontSize: 14,
+              color: midnightTeal,
+              fontSize: 25,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+
+          const SizedBox(height: 7),
+
+          const Text(
+            'Important updates about passenger boat operations.',
+            style: TextStyle(
+              color: mutedText,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          advisoryPreview(),
+
+          const SizedBox(height: 12),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: pureWhite,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFE2ECE8),
+              ),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: oceanTeal,
+                  size: 25,
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'New advisories from boat personnel will appear here when they are connected to the backend.',
+                    style: TextStyle(
+                      color: midnightTeal,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// PASSENGER PROFILE PAGE
+
+class PassengerProfilePage extends StatelessWidget {
+  const PassengerProfilePage({super.key});
+
+  static const Color midnightTeal = Color(0xFF073B40);
+  static const Color oceanTeal = Color(0xFF087EAB);
+  static const Color iceMint = Color(0xFFDDF4F1);
+  static const Color softBackground = Color(0xFFF5F9F8);
+  static const Color mutedText = Color(0xFF71817F);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: softBackground,
+      appBar: AppBar(
+        backgroundColor: softBackground,
+        elevation: 0,
+        iconTheme: const IconThemeData(
+          color: midnightTeal,
+        ),
+        title: const Text(
+          'My Profile',
+          style: TextStyle(
+            color: midnightTeal,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          children: [
+            const SizedBox(height: 25),
+
+            Container(
+              width: 105,
+              height: 105,
+              decoration: const BoxDecoration(
+                color: iceMint,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.person_rounded,
+                color: midnightTeal,
+                size: 60,
+              ),
+            ),
+
+            const SizedBox(height: 17),
+
+            const Text(
+              'Passenger Account',
+              style: TextStyle(
+                color: midnightTeal,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            const Text(
+              'Manage your passenger information',
+              style: TextStyle(
+                color: mutedText,
+                fontSize: 13,
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            profileInformation(
+              Icons.person_outline_rounded,
+              'Full Name',
+              'Not provided',
+            ),
+
+            const SizedBox(height: 13),
+
+            profileInformation(
+              Icons.email_outlined,
+              'Email Address',
+              'Not provided',
+            ),
+
+            const SizedBox(height: 13),
+
+            profileInformation(
+              Icons.badge_outlined,
+              'Account Type',
+              'Passenger',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget profileInformation(
+    IconData icon,
+    String title,
+    String value,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: oceanTeal,
+            size: 23,
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: mutedText,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: midnightTeal,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
