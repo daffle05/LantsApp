@@ -1,13 +1,24 @@
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
 import '../auth/login_screen.dart';
+import 'add_vessel_screen.dart';
+import 'manage_schedules_screen.dart';
+import 'manage_routes_screen.dart';
+import 'manage_advisories_screen.dart';
 
 class PersonnelDashboard extends StatefulWidget {
   final String fullName;
+  final int personnelId;
 
   const PersonnelDashboard({
     super.key,
     required this.fullName,
+    required this.personnelId,
   });
 
   @override
@@ -24,6 +35,10 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
 
   int selectedIndex = 0;
 
+  List<dynamic> vessels = [];
+  bool isLoadingVessels = false;
+  String? vesselError;
+
   String get fullName => widget.fullName;
 
   String get firstInitial {
@@ -32,36 +47,151 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
+  void initState() {
+    super.initState();
+    fetchMyVessels();
+  }
 
-      body: IndexedStack(
-        index: selectedIndex,
-        children: [
-          _buildHome(context),
-
-          _buildNavigationPage(
-            'Manage Vessels',
-            'Add and manage your registered vessel details.',
-            Icons.directions_boat_filled,
+  // HANDLE DEVICE BACK BUTTON
+  void handleBackButton() {
+    if (selectedIndex != 0) {
+      setState(() {
+        selectedIndex = 0;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You are already on the Home dashboard.',
           ),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
 
-          _buildNavigationPage(
-            'Manage Schedules',
-            'Set trips and departure times for your vessels.',
-            Icons.calendar_month_rounded,
-          ),
+  // FETCH PERSONNEL VESSELS FROM DATABASE
+  Future<void> fetchMyVessels() async {
+    if (!mounted) return;
 
-          _buildNavigationPage(
-            'My Profile',
-            'View your personnel account information.',
-            Icons.person_rounded,
-          ),
-        ],
+    setState(() {
+      isLoadingVessels = true;
+      vesselError = null;
+    });
+
+    try {
+      final String baseUrl = kIsWeb
+          ? 'http://localhost/lantsapp_api'
+          : 'http://10.0.2.2/lantsapp_api';
+
+      final url = Uri.parse(
+        '$baseUrl/get_my_vessels.php?personnel_id=${widget.personnelId}',
+      );
+
+      final response = await http.get(url);
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['success'] == true) {
+          setState(() {
+            vessels = data['vessels'] ?? [];
+            vesselError = null;
+          });
+        } else {
+          setState(() {
+            vesselError =
+                data['message'] ?? 'Unable to retrieve vessels.';
+          });
+        }
+      } else {
+        setState(() {
+          vesselError = 'Server error: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        vesselError =
+            'Unable to connect to the server. Check your connection.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingVessels = false;
+        });
+      }
+    }
+  }
+
+  // OPEN ADD VESSEL SCREEN
+  Future<void> openAddVesselScreen() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddVesselScreen(
+          personnelId: widget.personnelId,
+        ),
       ),
+    );
 
-      bottomNavigationBar: _buildBottomNavigationBar(),
+    if (!mounted) return;
+
+    if (result == true) {
+      setState(() {
+        selectedIndex = 1;
+      });
+
+      await fetchMyVessels();
+    }
+  }
+
+  // OPEN MANAGE ADVISORIES SCREEN
+  void openManageAdvisoriesScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManageAdvisoriesScreen(
+          personnelId: widget.personnelId,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        handleBackButton();
+      },
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        body: IndexedStack(
+          index: selectedIndex,
+          children: [
+            _buildHome(context),
+            _buildManageVesselsPage(),
+            ManageSchedulesScreen(
+              personnelId: widget.personnelId,
+            ),
+            ManageRoutesScreen(
+              personnelId: widget.personnelId,
+            ),
+            _buildNavigationPage(
+              'My Profile',
+              'View your personnel account information.',
+              Icons.person_rounded,
+            ),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNavigationBar(),
+      ),
     );
   }
 
@@ -73,17 +203,14 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // PERSONNEL PROFILE
             profileHeader(context),
 
             const SizedBox(height: 22),
 
-            // WELCOME BANNER
             welcomeBanner(),
 
             const SizedBox(height: 28),
 
-            // OPERATIONS HEADER
             sectionHeader(
               'Operations',
               'Manage your vessel activities',
@@ -92,7 +219,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
 
             const SizedBox(height: 15),
 
-            // OPERATION CARDS
             GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
@@ -101,33 +227,46 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
               mainAxisSpacing: 13,
               childAspectRatio: 1.70,
               children: [
-                // MANAGE VESSELS
                 featureCard(
                   'Manage Vessels',
                   'Add and manage vessel details',
                   Icons.directions_boat_filled,
                   oceanTeal,
-                  () => showFeatureMessage(
-                    context,
-                    'Manage Vessels',
-                  ),
+                  () {
+                    setState(() {
+                      selectedIndex = 1;
+                    });
+                    fetchMyVessels();
+                  },
                   imagePath: 'assets/images/1.jpg',
                 ),
 
-                // MANAGE SCHEDULES
                 featureCard(
                   'Manage Schedules',
                   'Set trips and departure times',
                   Icons.calendar_month_rounded,
                   const Color(0xFF269B78),
-                  () => showFeatureMessage(
-                    context,
-                    'Manage Schedules',
-                  ),
+                  () {
+                    setState(() {
+                      selectedIndex = 2;
+                    });
+                  },
                   imagePath: 'assets/images/2.jpg',
                 ),
 
-                // UPDATE TRIP STATUS
+                featureCard(
+                  'Manage Routes',
+                  'Set vessel origins and destinations',
+                  Icons.route_rounded,
+                  const Color(0xFF6376C5),
+                  () {
+                    setState(() {
+                      selectedIndex = 3;
+                    });
+                  },
+                  imagePath: 'assets/images/3.jpg',
+                ),
+
                 featureCard(
                   'Update Trip Status',
                   'Update current trip operations',
@@ -137,27 +276,21 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
                     context,
                     'Update Trip Status',
                   ),
-                  imagePath: 'assets/images/3.jpg',
+                  imagePath: 'assets/images/4.jpg',
                 ),
 
-                // PUBLISH ADVISORIES
                 featureCard(
                   'Publish Advisories',
                   'Send important passenger updates',
                   Icons.campaign_rounded,
                   const Color(0xFF6376C5),
-                  () => showFeatureMessage(
-                    context,
-                    'Publish Advisories',
-                  ),
-                  imagePath: 'assets/images/4.jpg',
+                  openManageAdvisoriesScreen,
                 ),
               ],
             ),
 
             const SizedBox(height: 13),
 
-            // GIS CARD
             featureCard(
               'GIS & Vessel Tracking',
               'Manage vessel locations and route information',
@@ -172,7 +305,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
 
             const SizedBox(height: 30),
 
-            // PASSENGER UPDATES
             sectionHeader(
               'Passenger Updates',
               'Recent information shared with passengers',
@@ -213,7 +345,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
 
             const SizedBox(height: 25),
 
-            // FOOTER
             Center(
               child: Text(
                 'LantsApp • Personnel Portal',
@@ -229,11 +360,319 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
     );
   }
 
+  // MANAGE VESSELS PAGE
+  Widget _buildManageVesselsPage() {
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: fetchMyVessels,
+        color: oceanTeal,
+        child: ListView(
+          padding: const EdgeInsets.all(18),
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Manage Vessels',
+                        style: TextStyle(
+                          color: deepOcean,
+                          fontSize: 23,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 5),
+                      Text(
+                        'View your registered vessels',
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                IconButton(
+                  onPressed: fetchMyVessels,
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                    color: oceanTeal,
+                    size: 27,
+                  ),
+                  tooltip: 'Refresh vessels',
+                ),
+
+                const SizedBox(width: 4),
+
+                ElevatedButton.icon(
+                  onPressed: openAddVesselScreen,
+                  icon: const Icon(
+                    Icons.add,
+                    size: 19,
+                  ),
+                  label: const Text('Add Vessel'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: oceanTeal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 22),
+
+            if (isLoadingVessels)
+              const Padding(
+                padding: EdgeInsets.all(35),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: oceanTeal,
+                  ),
+                ),
+              )
+            else if (vesselError != null)
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.red,
+                      size: 35,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      vesselError!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: fetchMyVessels,
+                      child: const Text('Try Again'),
+                    ),
+                  ],
+                ),
+              )
+            else if (vessels.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(25),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: lightMint),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(
+                      Icons.directions_boat_outlined,
+                      color: oceanTeal,
+                      size: 48,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'No Vessels Registered',
+                      style: TextStyle(
+                        color: deepOcean,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Your registered vessels will appear here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              Text(
+                'My Registered Vessels (${vessels.length})',
+                style: const TextStyle(
+                  color: deepOcean,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 13),
+
+              ...vessels.map((vessel) {
+                final status = (vessel['status'] ?? 'pending')
+                    .toString()
+                    .toLowerCase();
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 15),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: lightMint),
+                    boxShadow: [
+                      BoxShadow(
+                        color: deepOcean.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: lightMint,
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: const Icon(
+                              Icons.directions_boat_filled,
+                              color: oceanTeal,
+                              size: 26,
+                            ),
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          Expanded(
+                            child: Text(
+                              vessel['vessel_name']?.toString() ??
+                                  'Unnamed Vessel',
+                              style: const TextStyle(
+                                color: deepOcean,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      _vesselDetail(
+                        'Registration Number',
+                        vessel['registration_number']?.toString() ??
+                            'N/A',
+                      ),
+
+                      _vesselDetail(
+                        'Vessel Type',
+                        vessel['vessel_type']?.toString() ?? 'N/A',
+                      ),
+
+                      _vesselDetail(
+                        'Passenger Capacity',
+                        '${vessel['passenger_capacity'] ?? 'N/A'} passengers',
+                      ),
+
+                      _vesselDetail(
+                        'Route',
+                        vessel['route']?.toString() ?? 'N/A',
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: status == 'verified'
+                              ? Colors.green.withOpacity(0.10)
+                              : status == 'rejected'
+                                  ? Colors.red.withOpacity(0.10)
+                                  : Colors.orange.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          status.toUpperCase(),
+                          style: TextStyle(
+                            color: status == 'verified'
+                                ? Colors.green.shade700
+                                : status == 'rejected'
+                                    ? Colors.red
+                                    : Colors.orange.shade800,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // VESSEL DETAILS
+  Widget _vesselDetail(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 135,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.black54,
+                fontSize: 11,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: deepOcean,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // CUSTOM BOTTOM NAVIGATION BAR
   Widget _buildBottomNavigationBar() {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         child: Container(
           height: 78,
           decoration: BoxDecoration(
@@ -268,10 +707,16 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
                 2,
               ),
               _navItem(
+                Icons.route_outlined,
+                Icons.route_rounded,
+                'Routes',
+                3,
+              ),
+              _navItem(
                 Icons.person_outline,
                 Icons.person,
                 'Profile',
-                3,
+                4,
               ),
             ],
           ),
@@ -296,6 +741,10 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
           setState(() {
             selectedIndex = index;
           });
+
+          if (index == 1) {
+            fetchMyVessels();
+          }
         },
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -351,7 +800,7 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
     );
   }
 
-  // TEMPORARY NAVIGATION PAGES
+  // TEMPORARY NAVIGATION PAGE
   Widget _buildNavigationPage(
     String title,
     String subtitle,
@@ -466,7 +915,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
           ),
         ),
 
-        // NOTIFICATION BUTTON
         IconButton(
           onPressed: () {},
           tooltip: 'Notifications',
@@ -477,7 +925,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
           ),
         ),
 
-        // LOGOUT BUTTON
         IconButton(
           onPressed: () => confirmLogout(context),
           tooltip: 'Logout',
@@ -637,8 +1084,9 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
     bool centered = false,
   }) {
     return Column(
-      crossAxisAlignment:
-          centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: centered
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: double.infinity,
@@ -682,7 +1130,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
     bool horizontal = false,
     String? imagePath,
   }) {
-    // HORIZONTAL DESIGN FOR GIS
     if (horizontal) {
       return Material(
         color: Colors.white,
@@ -727,7 +1174,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
       );
     }
 
-    // FULL-BACKGROUND IMAGE FOR OPERATIONS CARDS
     return Material(
       color: lightMint,
       borderRadius: BorderRadius.circular(18),
@@ -737,7 +1183,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // BACKGROUND IMAGE
             if (imagePath != null)
               Image.asset(
                 imagePath,
@@ -766,7 +1211,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
                 ),
               ),
 
-            // DARK GRADIENT OVERLAY
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -781,7 +1225,6 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
               ),
             ),
 
-            // CARD TITLE AND DESCRIPTION
             Positioned(
               left: 12,
               right: 12,
@@ -846,8 +1289,9 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
     bool centered = false,
   }) {
     return Column(
-      crossAxisAlignment:
-          centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: centered
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Text(
           title,

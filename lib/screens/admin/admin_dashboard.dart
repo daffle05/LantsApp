@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'personnel_applications.dart';
+import 'vessel_approvals.dart';
 
 class AdminDashboard extends StatefulWidget {
   final int adminId;
@@ -237,14 +238,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
           const SizedBox(height: 12),
 
-          // SMALLER ILLUSTRATED STATISTIC CARDS
+          // ILLUSTRATED STATISTIC CARDS
           GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 9,
-                mainAxisSpacing: 9,
-                childAspectRatio: 1.61,
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 9,
+            mainAxisSpacing: 9,
+            childAspectRatio: 1.61,
             children: const [
               _DashboardCard(
                 title: 'Total Personnel',
@@ -390,12 +391,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
             },
           ),
 
+          // MANAGE VESSELS
           _MenuCard(
-            icon: Icons.manage_accounts_outlined,
+            icon: Icons.directions_boat_outlined,
             title: 'Manage Vessels',
-            subtitle: 'View and manage registered vessels',
+            subtitle: 'View and approve registered vessels',
             onTap: () {
-              showComingSoon('Manage Vessels');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VesselApprovals(
+                    adminId: widget.adminId,
+                  ),
+                ),
+              );
             },
           ),
         ],

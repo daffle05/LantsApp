@@ -105,6 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
             MaterialPageRoute(
               builder: (context) => PersonnelDashboard(
                 fullName: user.fullName,
+                personnelId: user.id,
               ),
             ),
           );
