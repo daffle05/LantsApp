@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../auth/login_screen.dart';
+import '../../services/vessel_tracking_service.dart';
 import 'add_vessel_screen.dart';
 import 'manage_schedules_screen.dart';
 import 'manage_routes_screen.dart';
@@ -33,11 +34,22 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
   static const Color lightMint = Color(0xFFCAF0E3);
   static const Color backgroundColor = Color(0xFFF7FBFC);
 
+  // Teal used by the redesigned Manage Vessels page
+  static const Color headerTeal = Color(0xFF0B7285);
+
   int selectedIndex = 0;
 
   List<dynamic> vessels = [];
   bool isLoadingVessels = false;
   String? vesselError;
+
+  // LIVE VESSEL TRACKING
+  VesselTrackingService? trackingService;
+  int? trackingVesselId;
+  String? trackingVesselName;
+
+  bool isTracking = false;
+  bool isStartingTracking = false;
 
   String get fullName => widget.fullName;
 
@@ -128,15 +140,351 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
     }
   }
 
+  // ---------------------------------------------------------------
+  // LIVE VESSEL GPS TRACKING
+  // ---------------------------------------------------------------
+
+  Future<void> startVesselTracking() async {
+    if (isTracking || isStartingTracking) return;
+
+    final verifiedVessels = vessels.where((vessel) {
+      return (vessel['status'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase() ==
+          'verified';
+    }).toList();
+
+    if (verifiedVessels.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You need a verified vessel before starting GPS tracking.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final selectedVessel = await showDialog<dynamic>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Select Vessel'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: verifiedVessels.length,
+              itemBuilder: (context, index) {
+                final vessel = verifiedVessels[index];
+
+                return ListTile(
+                  leading: const Icon(
+                    Icons.directions_boat,
+                    color: oceanTeal,
+                  ),
+                  title: Text(
+                    vessel['vessel_name']?.toString() ??
+                        'Unnamed Vessel',
+                  ),
+                  subtitle: const Text('Verified vessel'),
+                  onTap: () {
+                    Navigator.pop(dialogContext, vessel);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (selectedVessel == null || !mounted) return;
+
+    final int? vesselId = int.tryParse(
+      (selectedVessel['id'] ?? selectedVessel['vessel_id'])
+          .toString(),
+    );
+
+    if (vesselId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid vessel ID.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isStartingTracking = true;
+    });
+
+    VesselTrackingService? service;
+
+    try {
+      service = VesselTrackingService(
+        personnelId: widget.personnelId,
+        vesselId: vesselId,
+      );
+
+      final success = await service.startTracking();
+
+      if (!mounted) {
+        await service.stopTracking();
+        return;
+      }
+
+      if (success) {
+        trackingService = service;
+
+        setState(() {
+          trackingVesselId = vesselId;
+          trackingVesselName =
+              selectedVessel['vessel_name']?.toString() ??
+                  'Unnamed Vessel';
+          isTracking = true;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vessel GPS tracking started!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        await service.dispose();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to start tracking. Check your GPS permission and location settings.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Tracking error: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tracking error: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isStartingTracking = false;
+        });
+      }
+    }
+  }
+
+  Future<void> stopVesselTracking() async {
+    if (trackingService == null) return;
+
+    try {
+      await trackingService!.stopTracking();
+
+      if (!mounted) return;
+
+      setState(() {
+        trackingService = null;
+        trackingVesselId = null;
+        trackingVesselName = null;
+        isTracking = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vessel tracking stopped.'),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Stop tracking error: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to stop tracking: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  // LIVE TRACKING CARD
+  Widget _buildVesselTrackingCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isTracking ? mint : lightMint,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: deepOcean.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 45,
+                height: 45,
+                decoration: BoxDecoration(
+                  color: lightMint,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(
+                  Icons.location_on_rounded,
+                  color: oceanTeal,
+                  size: 25,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Live Vessel Tracking',
+                      style: TextStyle(
+                        color: deepOcean,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Share your vessel location with passengers.',
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isTracking
+                      ? Colors.green.withOpacity(0.12)
+                      : Colors.grey.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  isTracking ? 'LIVE' : 'OFFLINE',
+                  style: TextStyle(
+                    color: isTracking
+                        ? Colors.green
+                        : Colors.grey,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          if (isTracking) ...[
+            const SizedBox(height: 15),
+            Text(
+              'Currently tracking: ${trackingVesselName ?? 'Selected vessel'}',
+              style: const TextStyle(
+                color: deepOcean,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 15),
+            const Text(
+              'Select a verified vessel to begin sharing its GPS location.',
+              style: TextStyle(
+                color: Colors.black54,
+                fontSize: 12,
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 15),
+
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: isStartingTracking
+                  ? null
+                  : isTracking
+                      ? stopVesselTracking
+                      : startVesselTracking,
+              icon: isStartingTracking
+                  ? const SizedBox(
+                      width: 17,
+                      height: 17,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Icon(
+                      isTracking
+                          ? Icons.stop_circle_outlined
+                          : Icons.my_location_rounded,
+                    ),
+              label: Text(
+                isStartingTracking
+                    ? 'Starting Tracking...'
+                    : isTracking
+                        ? 'Stop Tracking'
+                        : 'Start GPS Tracking',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    isTracking ? Colors.redAccent : oceanTeal,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 13,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // OPEN ADD VESSEL SCREEN
   Future<void> openAddVesselScreen() async {
-    final result = await Navigator.push<bool>(
+    final result = await AddVesselScreen.show(
       context,
-      MaterialPageRoute(
-        builder: (context) => AddVesselScreen(
-          personnelId: widget.personnelId,
-        ),
-      ),
+      widget.personnelId,
     );
 
     if (!mounted) return;
@@ -179,9 +527,11 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
             _buildManageVesselsPage(),
             ManageSchedulesScreen(
               personnelId: widget.personnelId,
+              onBack: () => setState(() => selectedIndex = 0),
             ),
             ManageRoutesScreen(
               personnelId: widget.personnelId,
+              onBack: () => setState(() => selectedIndex = 0),
             ),
             _buildNavigationPage(
               'My Profile',
@@ -296,12 +646,13 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
               'Manage vessel locations and route information',
               Icons.map_rounded,
               oceanTeal,
-              () => showFeatureMessage(
-                context,
-                'GIS & Vessel Tracking',
-              ),
+              startVesselTracking,
               horizontal: true,
             ),
+
+            const SizedBox(height: 15),
+
+            _buildVesselTrackingCard(),
 
             const SizedBox(height: 30),
 
@@ -360,278 +711,377 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
     );
   }
 
-  // MANAGE VESSELS PAGE
+  // ---------------------------------------------------------------
+  // MANAGE VESSELS PAGE (REDESIGNED)
+  // Teal header + white body with large top-left radius
+  // + fixed "My registered vessels" heading + scrolling list
+  // + circular floating "Add vessel" button on the split
+  // ---------------------------------------------------------------
   Widget _buildManageVesselsPage() {
-    return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: fetchMyVessels,
-        color: oceanTeal,
-        child: ListView(
-          padding: const EdgeInsets.all(18),
-          children: [
-            Row(
+    final double topInset = MediaQuery.of(context).padding.top;
+    final double headerHeight = topInset + 230;
+    final double bodyTop = headerHeight - 50;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // TEAL HEADER
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: headerHeight,
+          child: Container(
+            color: headerTeal,
+            padding: EdgeInsets.fromLTRB(24, topInset + 16, 24, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _headerCircleButton(
+                      Icons.chevron_left_rounded,
+                      'Back to Home',
+                      () => setState(() => selectedIndex = 0),
+                    ),
+                    const Text(
+                      'Personnel',
+                      style: TextStyle(
+                        color: Color(0xFFD7F5EC),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    _headerCircleButton(
+                      Icons.refresh_rounded,
+                      'Refresh vessels',
+                      fetchMyVessels,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Manage Vessels',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'View and manage your registered vessels',
+                  style: TextStyle(
+                    color: Color(0xFFD7F5EC),
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // WHITE BODY WITH LARGE TOP-LEFT RADIUS
+        Positioned(
+          top: bodyTop,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(60),
+              ),
+            ),
+            child: Column(
+              children: [
+                // FIXED HEADING
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(30, 50, 30, 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Text(
-                        'Manage Vessels',
+                      const Text(
+                        'My registered vessels',
                         style: TextStyle(
                           color: deepOcean,
-                          fontSize: 23,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 5),
-                      Text(
-                        'View your registered vessels',
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 13,
+                      if (!isLoadingVessels && vesselError == null)
+                        Text(
+                          '${vessels.length} total',
+                          style: const TextStyle(
+                            color: headerTeal,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
 
-                IconButton(
-                  onPressed: fetchMyVessels,
-                  icon: const Icon(
-                    Icons.refresh_rounded,
-                    color: oceanTeal,
-                    size: 27,
-                  ),
-                  tooltip: 'Refresh vessels',
-                ),
-
-                const SizedBox(width: 4),
-
-                ElevatedButton.icon(
-                  onPressed: openAddVesselScreen,
-                  icon: const Icon(
-                    Icons.add,
-                    size: 19,
-                  ),
-                  label: const Text('Add Vessel'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: oceanTeal,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                // SCROLLING VESSEL LIST
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: fetchMyVessels,
+                    color: headerTeal,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(22, 4, 22, 30),
+                      children: [
+                        if (isLoadingVessels)
+                          const Padding(
+                            padding: EdgeInsets.all(35),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: headerTeal,
+                              ),
+                            ),
+                          )
+                        else if (vesselError != null)
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  color: Colors.red,
+                                  size: 35,
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  vesselError!,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                ElevatedButton(
+                                  onPressed: fetchMyVessels,
+                                  child: const Text('Try Again'),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (vessels.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(25),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F8F9),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Column(
+                              children: [
+                                Icon(
+                                  Icons.directions_boat_outlined,
+                                  color: headerTeal,
+                                  size: 48,
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  'No Vessels Registered',
+                                  style: TextStyle(
+                                    color: deepOcean,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Tap "Add vessel" below to register your first vessel.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ...vessels.map(_vesselCard),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
+          ),
+        ),
 
-            const SizedBox(height: 22),
-
-            if (isLoadingVessels)
-              const Padding(
-                padding: EdgeInsets.all(35),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: oceanTeal,
+        // FLOATING ADD VESSEL BUTTON
+        Positioned(
+          right: 24,
+          top: bodyTop - 32,
+          child: Tooltip(
+            message: 'Add vessel',
+            child: Material(
+              color: mint,
+              elevation: 10,
+              shadowColor: deepOcean.withOpacity(0.45),
+              shape: const CircleBorder(),
+              child: InkWell(
+                onTap: openAddVesselScreen,
+                customBorder: const CircleBorder(),
+                child: const SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: deepOcean,
+                    size: 32,
                   ),
                 ),
-              )
-            else if (vesselError != null)
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // HEADER CIRCLE BUTTON
+  Widget _headerCircleButton(
+    IconData icon,
+    String tooltip,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: Colors.white.withOpacity(0.16),
+      shape: const CircleBorder(),
+      child: IconButton(
+        onPressed: onTap,
+        tooltip: tooltip,
+        icon: Icon(icon, color: Colors.white, size: 24),
+      ),
+    );
+  }
+
+  // VESSEL CARD
+  Widget _vesselCard(dynamic vessel) {
+    final status =
+        (vessel['status'] ?? 'pending').toString().toLowerCase();
+
+    final Color chipBg = status == 'verified'
+        ? const Color(0xFFDFF5E8)
+        : status == 'rejected'
+            ? const Color(0xFFFDE2E2)
+            : const Color(0xFFFFF1CF);
+
+    final Color chipText = status == 'verified'
+        ? const Color(0xFF1F6B45)
+        : status == 'rejected'
+            ? const Color(0xFFB42318)
+            : const Color(0xFF8A5A00);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8F9),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
               Container(
-                padding: const EdgeInsets.all(18),
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(16),
+                  color: const Color(0xFFCAF0E3),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.error_outline_rounded,
-                      color: Colors.red,
-                      size: 35,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      vesselError!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: fetchMyVessels,
-                      child: const Text('Try Again'),
-                    ),
-                  ],
-                ),
-              )
-            else if (vessels.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(25),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: lightMint),
-                ),
-                child: const Column(
-                  children: [
-                    Icon(
-                      Icons.directions_boat_outlined,
-                      color: oceanTeal,
-                      size: 48,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'No Vessels Registered',
-                      style: TextStyle(
-                        color: deepOcean,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Your registered vessels will appear here.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.black54,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else ...[
-              Text(
-                'My Registered Vessels (${vessels.length})',
-                style: const TextStyle(
-                  color: deepOcean,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                child: const Icon(
+                  Icons.directions_boat_filled,
+                  color: headerTeal,
+                  size: 24,
                 ),
               ),
 
-              const SizedBox(height: 13),
+              const SizedBox(width: 14),
 
-              ...vessels.map((vessel) {
-                final status = (vessel['status'] ?? 'pending')
-                    .toString()
-                    .toLowerCase();
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 15),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: lightMint),
-                    boxShadow: [
-                      BoxShadow(
-                        color: deepOcean.withOpacity(0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      vessel['vessel_name']?.toString() ??
+                          'Unnamed Vessel',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: deepOcean,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      vessel['vessel_type']?.toString() ?? 'N/A',
+                      style: const TextStyle(
+                        color: Color(0xFF4F6B75),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: chipBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  status[0].toUpperCase() + status.substring(1),
+                  style: TextStyle(
+                    color: chipText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: lightMint,
-                              borderRadius: BorderRadius.circular(13),
-                            ),
-                            child: const Icon(
-                              Icons.directions_boat_filled,
-                              color: oceanTeal,
-                              size: 26,
-                            ),
-                          ),
-
-                          const SizedBox(width: 12),
-
-                          Expanded(
-                            child: Text(
-                              vessel['vessel_name']?.toString() ??
-                                  'Unnamed Vessel',
-                              style: const TextStyle(
-                                color: deepOcean,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 15),
-
-                      _vesselDetail(
-                        'Registration Number',
-                        vessel['registration_number']?.toString() ??
-                            'N/A',
-                      ),
-
-                      _vesselDetail(
-                        'Vessel Type',
-                        vessel['vessel_type']?.toString() ?? 'N/A',
-                      ),
-
-                      _vesselDetail(
-                        'Passenger Capacity',
-                        '${vessel['passenger_capacity'] ?? 'N/A'} passengers',
-                      ),
-
-                      _vesselDetail(
-                        'Route',
-                        vessel['route']?.toString() ?? 'N/A',
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: status == 'verified'
-                              ? Colors.green.withOpacity(0.10)
-                              : status == 'rejected'
-                                  ? Colors.red.withOpacity(0.10)
-                                  : Colors.orange.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          status.toUpperCase(),
-                          style: TextStyle(
-                            color: status == 'verified'
-                                ? Colors.green.shade700
-                                : status == 'rejected'
-                                    ? Colors.red
-                                    : Colors.orange.shade800,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+                ),
+              ),
             ],
-          ],
-        ),
+          ),
+
+          const SizedBox(height: 14),
+
+          _vesselDetail(
+            'Registration Number',
+            vessel['registration_number']?.toString() ?? 'N/A',
+          ),
+
+          _vesselDetail(
+            'Passenger Capacity',
+            '${vessel['passenger_capacity'] ?? 'N/A'} passengers',
+          ),
+
+          _vesselDetail(
+            'Route',
+            vessel['route']?.toString() ?? 'N/A',
+          ),
+        ],
       ),
     );
   }
@@ -648,7 +1098,7 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
             child: Text(
               label,
               style: const TextStyle(
-                color: Colors.black54,
+                color: Color(0xFF4F6B75),
                 fontSize: 11,
               ),
             ),
@@ -1419,5 +1869,12 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
         backgroundColor: deepOcean,
       ),
     );
+  }
+
+  // CLEAN UP TRACKING WHEN DASHBOARD IS DESTROYED
+  @override
+  void dispose() {
+    trackingService?.dispose();
+    super.dispose();
   }
 }
