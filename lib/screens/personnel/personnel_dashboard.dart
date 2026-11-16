@@ -12,6 +12,9 @@ import 'manage_schedules_screen.dart';
 import 'manage_routes_screen.dart';
 import 'manage_advisories_screen.dart';
 
+import 'manage_fares_screen.dart';
+
+
 class PersonnelDashboard extends StatefulWidget {
   final String fullName;
   final int personnelId;
@@ -510,6 +513,18 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
     );
   }
 
+// OPEN MANAGE FARES SCREEN
+void openManageFaresScreen() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ManageFaresScreen(
+        personnelId: widget.personnelId,
+      ),
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -615,6 +630,15 @@ class _PersonnelDashboardState extends State<PersonnelDashboard> {
                     });
                   },
                   imagePath: 'assets/images/3.jpg',
+                ),
+
+                featureCard(
+                  'Manage Fares',
+                  'Set and update passenger fares for your routes',
+                  Icons.payments_rounded,
+                  const Color(0xFF269B78),
+                  openManageFaresScreen,
+                  imagePath: 'assets/images/4.jpg',
                 ),
 
                 featureCard(

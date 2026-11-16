@@ -30,6 +30,21 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
   final TextEditingController searchController = TextEditingController();
   final List<Map<String, dynamic>> registeredVessels = [];
 
+final List<Map<String, dynamic>> advisories = [];
+
+final List<Map<String, dynamic>> passengerFares = [];
+
+bool isLoadingFares = false;
+bool hasCalculatedFare = false;
+String? fareError;
+
+String? selectedVesselId;
+String? selectedFareRouteId;
+String? selectedPassengerType;
+
+int passengerCount = 1;
+bool isLoadingAdvisories = false;
+String? advisoryError;
   bool isLoadingVessels = false;
   String? vesselError;
 
@@ -40,11 +55,13 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
     return 'http://10.0.2.2/lantsapp_api';
   }
 
-  @override
-  void initState() {
-    super.initState();
-    fetchRegisteredVessels();
-  }
+ @override
+    void initState() {
+      super.initState();
+      fetchRegisteredVessels();
+      fetchPassengerAdvisories();
+      fetchPassengerFares();
+    }
 
   @override
   void dispose() {
@@ -119,15 +136,192 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
         child: IndexedStack(
           index: selectedIndex,
           children: [
-            homePage(),
-            const BoatMapScreen(),
-            advisoriesPage(),
-          ],
+  homePage(),
+  const BoatMapScreen(),
+  advisoriesPage(),
+  fareMonitoringPage(),
+],
         ),
       ),
       bottomNavigationBar: bottomNavigation(),
     );
   }
+  
+Future<void> fetchPassengerFares() async {
+  if (!mounted) return;
+
+  setState(() {
+    isLoadingFares = true;
+    fareError = null;
+  });
+
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/get_passenger_fare_options.php'),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Server returned status ${response.statusCode}.',
+      );
+    }
+
+    final data = jsonDecode(response.body);
+
+    if (data['success'] != true) {
+      throw Exception(
+        data['message'] ?? 'Unable to retrieve fare options.',
+      );
+    }
+
+    final List<dynamic> fetchedFares =
+        data['fare_options'] ?? [];
+
+    if (!mounted) return;
+
+    setState(() {
+      passengerFares.clear();
+
+      passengerFares.addAll(
+        fetchedFares.map(
+          (item) => Map<String, dynamic>.from(item),
+        ),
+      );
+
+      isLoadingFares = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      isLoadingFares = false;
+      fareError = e.toString();
+    });
+  }
+}
+
+
+  Future<void> fetchPassengerAdvisories() async {
+  if (!mounted) return;
+
+  setState(() {
+    isLoadingAdvisories = true;
+    advisoryError = null;
+  });
+
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/get_passenger_advisories.php'),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      if (data['success'] == true) {
+        final List<dynamic> fetchedAdvisories =
+            data['advisories'] ?? [];
+
+        if (!mounted) return;
+
+        setState(() {
+          advisories.clear();
+          advisories.addAll(
+            fetchedAdvisories.map(
+              (item) => Map<String, dynamic>.from(item),
+            ),
+          );
+
+          isLoadingAdvisories = false;
+        });
+      } else {
+        throw Exception(
+          data['message'] ?? 'Unable to retrieve advisories.',
+        );
+      }
+    } else {
+      throw Exception(
+        'Server returned status ${response.statusCode}.',
+      );
+    }
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      isLoadingAdvisories = false;
+      advisoryError = e.toString();
+    });
+  }
+}
+IconData getAdvisoryIcon(String type) {
+  switch (type.toLowerCase()) {
+    case 'weather':
+      return Icons.cloud_rounded;
+    case 'delay':
+      return Icons.access_time_rounded;
+    case 'cancellation':
+      return Icons.cancel_rounded;
+    case 'suspension':
+      return Icons.warning_amber_rounded;
+    default:
+      return Icons.campaign_rounded;
+  }
+}
+
+Color getAdvisoryColor(String type) {
+  switch (type.toLowerCase()) {
+    case 'weather':
+      return const Color(0xFF3979B9);
+    case 'delay':
+      return const Color(0xFFD18A28);
+    case 'cancellation':
+      return const Color(0xFFC94C4C);
+    case 'suspension':
+      return const Color(0xFFAD781C);
+    default:
+      return oceanTeal;
+  }
+}
+
+String formatAdvisoryDate(dynamic dateValue) {
+  if (dateValue == null) {
+    return 'Date unavailable';
+  }
+
+  final parsedDate = DateTime.tryParse(dateValue.toString());
+
+  if (parsedDate == null) {
+    return dateValue.toString();
+  }
+
+  final date = parsedDate.toLocal();
+
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
+  final hour = date.hour == 0
+      ? 12
+      : date.hour > 12
+          ? date.hour - 12
+          : date.hour;
+
+  final minute = date.minute.toString().padLeft(2, '0');
+  final period = date.hour >= 12 ? 'PM' : 'AM';
+
+  return '${months[date.month - 1]} ${date.day}, ${date.year} • $hour:$minute $period';
+}
+
 
   // BOTTOM NAVIGATION
 
@@ -445,12 +639,14 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
         },
       },
       {
-        'title': 'Fare',
-        'icon': Icons.payments_outlined,
-        'action': () {
-          showMessage('Fare monitoring will be available here.');
-        },
-      },
+  'title': 'Fare',
+  'icon': Icons.payments_outlined,
+  'action': () {
+    setState(() {
+      selectedIndex = 3;
+    });
+  },
+},
     ];
 
     return Row(
@@ -1025,73 +1221,1233 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
   // ADVISORY PREVIEW
 
   Widget advisoryPreview() {
+  if (isLoadingAdvisories) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
         color: pureWhite,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE8E6D7)),
+        border: Border.all(color: iceMint),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+
+  if (advisoryError != null) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: pureWhite,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: iceMint),
+      ),
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF3D8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.warning_amber_rounded,
-              color: Color(0xFFAD781C),
-              size: 25,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Weather Advisory',
-                  style: TextStyle(
-                    color: midnightTeal,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Please check the latest weather conditions before traveling.',
-                  style: TextStyle(
-                    color: mutedText,
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
+          const Text('Unable to load advisories.'),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: fetchPassengerAdvisories,
+            child: const Text('Try Again'),
           ),
         ],
       ),
     );
   }
 
+  if (advisories.isEmpty) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: pureWhite,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: iceMint),
+      ),
+      child: const Text(
+        'No active trip advisories at the moment.',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: mutedText),
+      ),
+    );
+  }
+
+  final advisory = advisories.first;
+
+  final type = advisory['advisory_type']?.toString() ?? 'General';
+  final title = advisory['title']?.toString() ?? 'Trip Advisory';
+  final message = advisory['message']?.toString() ?? '';
+  final vessel = advisory['vessel_name']?.toString() ?? 'Passenger Vessel';
+
+  final color = getAdvisoryColor(type);
+
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: pureWhite,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: iceMint),
+      boxShadow: [
+        BoxShadow(
+          color: midnightTeal.withOpacity(0.04),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                getAdvisoryIcon(type),
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    type.toUpperCase(),
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: midnightTeal,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text(
+          message,
+          style: const TextStyle(
+            color: mutedText,
+            fontSize: 13,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'Vessel: $vessel',
+          style: const TextStyle(
+            color: midnightTeal,
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          formatAdvisoryDate(advisory['created_at']),
+          style: const TextStyle(
+            color: mutedText,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () {
+              setState(() {
+                selectedIndex = 2;
+              });
+            },
+            child: const Text('View All Advisories'),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
   // ADVISORIES PAGE
 
-  Widget advisoriesPage() {
-    return SingleChildScrollView(
+
+// FARE MONITORING PAGE
+
+
+
+Widget fareMonitoringPage() {
+  // Only show vessels with active fare records.
+  final availableVessels = registeredVessels.where((vessel) {
+    final vesselId = vessel['id'].toString();
+
+    return passengerFares.any(
+      (fare) => fare['vessel_id'].toString() == vesselId,
+    );
+  }).toList();
+
+  final currentVesselId = availableVessels.any(
+    (vessel) => vessel['id'].toString() == selectedVesselId,
+  )
+      ? selectedVesselId
+      : null;
+
+  // Get fares for the selected vessel.
+  final vesselFares = currentVesselId == null
+      ? <Map<String, dynamic>>[]
+      : passengerFares.where((fare) {
+          return fare['vessel_id'].toString() == currentVesselId;
+        }).toList();
+
+  // Get unique routes.
+  final Map<String, Map<String, dynamic>> routeMap = {};
+
+  for (final fare in vesselFares) {
+    final routeId = fare['route_id'].toString();
+    routeMap.putIfAbsent(routeId, () => fare);
+  }
+
+  final routeEntries = routeMap.entries.toList();
+
+  final currentRouteId = routeMap.containsKey(selectedFareRouteId)
+      ? selectedFareRouteId
+      : null;
+
+  // Get passenger types for the selected route.
+  final selectedRouteFares = currentRouteId == null
+      ? <Map<String, dynamic>>[]
+      : vesselFares.where((fare) {
+          return fare['route_id'].toString() == currentRouteId;
+        }).toList();
+
+  final passengerTypes = selectedRouteFares
+      .map((fare) => fare['passenger_type'].toString())
+      .toSet()
+      .toList();
+
+  final currentPassengerType =
+      passengerTypes.contains(selectedPassengerType)
+          ? selectedPassengerType
+          : null;
+
+  // Find the selected fare.
+  Map<String, dynamic>? selectedFare;
+
+  if (hasCalculatedFare &&
+      currentRouteId != null &&
+      currentPassengerType != null) {
+    for (final fare in selectedRouteFares) {
+      if (fare['passenger_type'].toString() ==
+          currentPassengerType) {
+        selectedFare = fare;
+        break;
+      }
+    }
+  }
+
+  final fareAmount = selectedFare == null
+      ? 0.0
+      : double.tryParse(
+            selectedFare['fare_amount'].toString(),
+          ) ??
+          0.0;
+
+  final totalFare = fareAmount * passengerCount;
+
+  // Reusable input decoration.
+  InputDecoration fareInputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(
+        color: mutedText,
+        fontSize: 13,
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 15,
+        vertical: 16,
+      ),
+      filled: true,
+      fillColor: pureWhite,
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(
+          color: Color(0xFFE1ECEA),
+          width: 1,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(
+          color: oceanTeal,
+          width: 1.3,
+        ),
+      ),
+    );
+  }
+
+  Widget sectionLabel(String number, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 25,
+          height: 25,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: iceMint,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            number,
+            style: const TextStyle(
+              color: midnightTeal,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 9),
+        Text(
+          label,
+          style: const TextStyle(
+            color: midnightTeal,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+
+  return Scaffold(
+    backgroundColor: softBackground,
+
+    body: SafeArea(
+      child: RefreshIndicator(
+        color: oceanTeal,
+        onRefresh: () async {
+          await fetchRegisteredVessels();
+          await fetchPassengerFares();
+        },
+
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            // HEADER IMAGE
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 225,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset(
+                      'assets/images/infobg.jpg',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Color(0xFF087EAB),
+                                Color(0xFF073B40),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // Dark overlay.
+                    Container(
+                      color: Colors.black.withOpacity(0.30),
+                    ),
+
+                    // Header controls.
+                    Positioned(
+                      top: 10,
+                      left: 12,
+                      right: 12,
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                selectedIndex = 0;
+                              });
+                            },
+                            icon: const Icon(
+                              Icons.arrow_back_rounded,
+                              color: pureWhite,
+                              size: 25,
+                            ),
+                          ),
+
+                          const Spacer(),
+
+                          IconButton(
+                            onPressed: isLoadingFares || isLoadingVessels
+                                ? null
+                                : () async {
+                                    await fetchRegisteredVessels();
+                                    await fetchPassengerFares();
+                                  },
+                            icon: const Icon(
+                              Icons.refresh_rounded,
+                              color: pureWhite,
+                              size: 23,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Centered title.
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 35),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'fare calculator',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: pureWhite,
+                                fontSize: 27,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Know your estimated boat fare',
+                              style: TextStyle(
+                                color: pureWhite,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // MAIN WHITE FORM CARD
+            SliverToBoxAdapter(
+              child: Transform.translate(
+  offset: const Offset(0, -45),
+                child: Container(
+  width: double.infinity,
+
+  margin: const EdgeInsets.symmetric(horizontal: 15),
+
+  padding: const EdgeInsets.fromLTRB(
+    22,
+    30,
+    22,
+    30,
+  ),
+
+  decoration: BoxDecoration(
+    color: pureWhite,
+
+    borderRadius: BorderRadius.circular(28),
+
+    boxShadow: [
+      BoxShadow(
+        color: midnightTeal.withOpacity(0.13),
+        blurRadius: 25,
+        spreadRadius: 1,
+        offset: const Offset(0, 10),
+      ),
+    ],
+  ),
+
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Calculate your trip',
+                        style: TextStyle(
+                          color: midnightTeal,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      const Text(
+                        'Enter your travel information below to estimate your total fare.',
+                        style: TextStyle(
+                          color: mutedText,
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
+                      ),
+
+                      const SizedBox(height: 25),
+
+                      // LOADING
+                      if (isLoadingFares || isLoadingVessels)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(35),
+                            child: CircularProgressIndicator(
+                              color: oceanTeal,
+                            ),
+                          ),
+                        )
+
+                      // ERROR
+                      else if (fareError != null || vesselError != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: softBackground,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.wifi_off_rounded,
+                                color: mutedText,
+                                size: 38,
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                'Unable to load fare information.',
+                                style: TextStyle(
+                                  color: midnightTeal,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                onPressed: () async {
+                                  await fetchRegisteredVessels();
+                                  await fetchPassengerFares();
+                                },
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Try Again'),
+                              ),
+                            ],
+                          ),
+                        )
+
+                      // NO AVAILABLE VESSELS
+                      else if (availableVessels.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: softBackground,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(
+                                Icons.directions_boat_outlined,
+                                color: mutedText,
+                                size: 43,
+                              ),
+                              SizedBox(height: 12),
+                              Text(
+                                'No Fare Options Available',
+                                style: TextStyle(
+                                  color: midnightTeal,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'There are currently no registered vessels with active fare records.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: mutedText,
+                                  fontSize: 12,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+
+                      // FARE FORM
+                      else ...[
+                        // 1. VESSEL
+                        sectionLabel(
+                          '1',
+                          'SELECTED REGISTERED VESSELS',
+                        ),
+
+                        const SizedBox(height: 11),
+
+                        DropdownButtonFormField<String>(
+                          value: currentVesselId,
+                          isExpanded: true,
+                          decoration: fareInputDecoration(
+                            'Choose a vessel',
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: oceanTeal,
+                          ),
+                          items: availableVessels.map((vessel) {
+                            final id = vessel['id'].toString();
+
+                            return DropdownMenuItem<String>(
+                              value: id,
+                              child: Text(
+                                vessel['vessel_name']?.toString() ??
+                                    'Unnamed Vessel',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: midnightTeal,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedVesselId = value;
+                              selectedFareRouteId = null;
+                              selectedPassengerType = null;
+                              passengerCount = 1;
+                              hasCalculatedFare = false;
+                            });
+                          },
+                        ),
+
+                        if (currentVesselId != null) ...[
+                          const SizedBox(height: 10),
+
+                          Builder(
+                            builder: (context) {
+                              final vessel = availableVessels.firstWhere(
+                                (item) =>
+                                    item['id'].toString() ==
+                                    currentVesselId,
+                              );
+
+                              final ownerName =
+                                  vessel['owner_name']?.toString() ??
+                                      'Registered Personnel';
+
+                              return Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: iceMint,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.person_outline_rounded,
+                                      color: oceanTeal,
+                                      size: 19,
+                                    ),
+                                    const SizedBox(width: 9),
+                                    Expanded(
+                                      child: Text(
+                                        'Registered by: $ownerName',
+                                        style: const TextStyle(
+                                          color: midnightTeal,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+
+                        const SizedBox(height: 23),
+
+                        // 2. ROUTE
+                        sectionLabel(
+                          '2',
+                          'SELECT ROUTE',
+                        ),
+
+                        const SizedBox(height: 11),
+
+                        DropdownButtonFormField<String>(
+                          value: currentRouteId,
+                          isExpanded: true,
+                          decoration: fareInputDecoration(
+                            'Choose your route',
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: oceanTeal,
+                          ),
+                          items: routeEntries.map((entry) {
+                            final route = entry.value;
+
+                            return DropdownMenuItem<String>(
+                              value: entry.key,
+                              child: Text(
+                                '${route['origin']} → ${route['destination']}',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: midnightTeal,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: currentVesselId == null
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    selectedFareRouteId = value;
+                                    selectedPassengerType = null;
+                                    hasCalculatedFare = false;
+                                  });
+                                },
+                        ),
+
+                        const SizedBox(height: 23),
+
+                        // 3. PASSENGER TYPE
+                        sectionLabel(
+                          '3',
+                          'SELECT PASSENGER TYPE',
+                        ),
+
+                        const SizedBox(height: 11),
+
+                        if (currentRouteId == null)
+                          const Text(
+                            'Please select a route first.',
+                            style: TextStyle(
+                              color: mutedText,
+                              fontSize: 12,
+                            ),
+                          )
+                        else if (passengerTypes.isEmpty)
+                          const Text(
+                            'No passenger types available for this route.',
+                            style: TextStyle(
+                              color: mutedText,
+                              fontSize: 12,
+                            ),
+                          )
+                        else
+                          Wrap(
+                            spacing: 9,
+                            runSpacing: 10,
+                            children: passengerTypes.map((type) {
+                              final isSelected =
+                                  type == currentPassengerType;
+
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    selectedPassengerType = type;
+                                    hasCalculatedFare = false;
+                                  });
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(
+                                    milliseconds: 180,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 17,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? midnightTeal
+                                        : softBackground,
+                                    borderRadius: BorderRadius.circular(25),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? midnightTeal
+                                          : const Color(0xFFE1ECEA),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    type,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? pureWhite
+                                          : midnightTeal,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+
+                        const SizedBox(height: 23),
+
+                        // 4. PASSENGER QUANTITY
+                        sectionLabel(
+                          '4',
+                          'NUMBER OF PASSENGERS',
+                        ),
+
+                        const SizedBox(height: 11),
+
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: softBackground,
+                            borderRadius: BorderRadius.circular(13),
+                            border: Border.all(
+                              color: const Color(0xFFE1ECEA),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Passenger quantity',
+                                      style: TextStyle(
+                                        color: midnightTeal,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    SizedBox(height: 3),
+                                    Text(
+                                      'Number of travelers',
+                                      style: TextStyle(
+                                        color: mutedText,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              IconButton(
+                                onPressed: passengerCount > 1
+                                    ? () {
+                                        setState(() {
+                                          passengerCount--;
+                                        });
+                                      }
+                                    : null,
+                                icon: const Icon(
+                                  Icons.remove_circle_outline_rounded,
+                                ),
+                                color: oceanTeal,
+                              ),
+
+                              Text(
+                                '$passengerCount',
+                                style: const TextStyle(
+                                  color: midnightTeal,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+
+                              IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    passengerCount++;
+                                  });
+                                },
+                                icon: const Icon(
+                                  Icons.add_circle_outline_rounded,
+                                ),
+                                color: oceanTeal,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 25),
+
+                        // CALCULATED FARE RESULT
+                        if (selectedFare != null)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: midnightTeal,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: midnightTeal.withOpacity(0.13),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.receipt_long_rounded,
+                                      color: Color(0xFF8BE5DF),
+                                      size: 22,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Your Fare Estimate',
+                                      style: TextStyle(
+                                        color: pureWhite,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 20),
+
+                                Text(
+                                  selectedFare['vessel_name']
+                                          ?.toString() ??
+                                      'Selected Vessel',
+                                  style: TextStyle(
+                                    color: pureWhite.withOpacity(0.85),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 6),
+
+                                Text(
+                                  '${selectedFare['origin']} → ${selectedFare['destination']}',
+                                  style: const TextStyle(
+                                    color: pureWhite,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 18),
+
+                                Divider(
+                                  color: pureWhite.withOpacity(0.2),
+                                ),
+
+                                const SizedBox(height: 13),
+
+                                _fareDetailRow(
+                                  'Fare per passenger',
+                                  '₱${fareAmount.toStringAsFixed(2)}',
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                _fareDetailRow(
+                                  'Passenger type',
+                                  currentPassengerType ?? '',
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                _fareDetailRow(
+                                  'Number of passengers',
+                                  '$passengerCount',
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                Divider(
+                                  color: pureWhite.withOpacity(0.2),
+                                ),
+
+                                const SizedBox(height: 14),
+
+                                Text(
+                                  'TOTAL ESTIMATED FARE',
+                                  style: TextStyle(
+                                    color: pureWhite.withOpacity(0.75),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 7),
+
+                                Text(
+                                  '₱${totalFare.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF8BE5DF),
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 13),
+
+                                Text(
+                                  'Effective from: ${selectedFare['effective_from'] ?? 'Not specified'}',
+                                  style: TextStyle(
+                                    color: pureWhite.withOpacity(0.75),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(17),
+                            decoration: BoxDecoration(
+                              color: softBackground,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(
+                              hasCalculatedFare
+                                  ? 'No fare found for the selected route and passenger type.'
+                                  : 'Your estimated fare will appear here after you complete the selections and tap Calculate.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: mutedText,
+                                fontSize: 11,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+
+                        const SizedBox(height: 20),
+
+                        // INFORMATION NOTE
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: iceMint,
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: const Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.info_outline_rounded,
+                                color: oceanTeal,
+                                size: 20,
+                              ),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'This is an estimated fare based on the latest available records provided by registered boat personnel. Please confirm the fare before traveling.',
+                                  style: TextStyle(
+                                    color: midnightTeal,
+                                    fontSize: 10,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Extra bottom space for the fixed button.
+            const SliverToBoxAdapter(
+  child: SizedBox(height: 40),
+),
+          ],
+        ),
+      ),
+    ),
+
+    // FIXED BOTTOM CALCULATE BUTTON
+    bottomNavigationBar: availableVessels.isNotEmpty &&
+            !isLoadingFares &&
+            !isLoadingVessels &&
+            fareError == null &&
+            vesselError == null
+        ? Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 15),
+            decoration: BoxDecoration(
+              color: pureWhite,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 15,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: SizedBox(
+              height: 54,
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isLoadingFares
+                    ? null
+                    : () async {
+                        if (selectedVesselId == null ||
+                            selectedFareRouteId == null ||
+                            selectedPassengerType == null) {
+                          showMessage(
+                            'Please select a vessel, route, and passenger type.',
+                          );
+                          return;
+                        }
+
+                        // Fetch the latest fare records.
+                        await fetchPassengerFares();
+
+                        if (!mounted) return;
+
+                        // Only show the result if fetching succeeded.
+                        if (fareError == null) {
+                          setState(() {
+                            hasCalculatedFare = true;
+                          });
+                        } else {
+                          showMessage(
+                            'Unable to retrieve the latest fare. Please try again.',
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: midnightTeal,
+                  foregroundColor: pureWhite,
+                  disabledBackgroundColor: mutedText,
+                  elevation: 5,
+                  shadowColor: midnightTeal.withOpacity(0.25),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.calculate_rounded,
+                      size: 20,
+                    ),
+                    SizedBox(width: 9),
+                    Text(
+                      'Calculate',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+  : null,
+  );
+}
+
+
+Widget _fareDetailRow(String label, String value) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          color: pureWhite.withOpacity(0.8),
+          fontSize: 12,
+        ),
+      ),
+      Text(
+        value,
+        style: const TextStyle(
+          color: pureWhite,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ],
+  );
+}
+
+
+
+  // ADVISORIES PAGE
+
+Widget advisoriesPage() {
+  return RefreshIndicator(
+    color: oceanTeal,
+    onRefresh: fetchPassengerAdvisories,
+    child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Trip Advisories',
-            style: TextStyle(
-              color: midnightTeal,
-              fontSize: 25,
-              fontWeight: FontWeight.w800,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Trip Advisories',
+                  style: TextStyle(
+                    color: midnightTeal,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: isLoadingAdvisories
+                    ? null
+                    : fetchPassengerAdvisories,
+                tooltip: 'Refresh Advisories',
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: oceanTeal,
+                  size: 25,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 7),
           const Text(
@@ -1103,42 +2459,251 @@ class _PassengerDashboardState extends State<PassengerDashboard> {
             ),
           ),
           const SizedBox(height: 20),
-          advisoryPreview(),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: pureWhite,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE2ECE8)),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.info_outline_rounded,
+
+          // LOADING STATE
+
+          if (isLoadingAdvisories)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(30),
+                child: CircularProgressIndicator(
                   color: oceanTeal,
-                  size: 25,
                 ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'New advisories from boat personnel will appear here when they are connected to the backend.',
+              ),
+            )
+
+          // ERROR STATE
+
+          else if (advisoryError != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: pureWhite,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.wifi_off_rounded,
+                    color: mutedText,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Unable to load trip advisories.',
                     style: TextStyle(
                       color: midnightTeal,
-                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: fetchPassengerAdvisories,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try Again'),
+                  ),
+                ],
+              ),
+            )
+
+          // EMPTY STATE
+
+          else if (advisories.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(25),
+              decoration: BoxDecoration(
+                color: pureWhite,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color(0xFFE2ECE8),
+                ),
+              ),
+              child: const Column(
+                children: [
+                  Icon(
+                    Icons.campaign_outlined,
+                    color: mutedText,
+                    size: 45,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'No Active Advisories',
+                    style: TextStyle(
+                      color: midnightTeal,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'There are currently no active trip advisories. '
+                    'Please check again later.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: mutedText,
+                      fontSize: 12,
                       height: 1.5,
                     ),
                   ),
+                ],
+              ),
+            )
+
+          // DISPLAY ALL ACTIVE ADVISORIES
+
+          else
+            ...advisories.map((advisory) {
+              final String type =
+                  (advisory['advisory_type'] ?? 'General')
+                      .toString();
+
+              final String title =
+                  (advisory['title'] ?? 'Untitled Advisory')
+                      .toString();
+
+              final String message =
+                  (advisory['message'] ?? '').toString();
+
+              final String vesselName =
+                  (advisory['vessel_name'] ?? 'Unknown Vessel')
+                      .toString();
+
+              final Color typeColor =
+                  getAdvisoryColor(type);
+
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: pureWhite,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: typeColor.withOpacity(0.25),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: midnightTeal.withOpacity(0.05),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: typeColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            getAdvisoryIcon(type),
+                            color: typeColor,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                type.toUpperCase(),
+                                style: TextStyle(
+                                  color: typeColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.7,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  color: midnightTeal,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        color: mutedText,
+                        fontSize: 12,
+                        height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    const Divider(
+                      color: Color(0xFFE8EFED),
+                      height: 1,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.directions_boat_rounded,
+                          color: oceanTeal,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            vesselName,
+                            style: const TextStyle(
+                              color: midnightTeal,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.access_time_rounded,
+                          color: mutedText,
+                          size: 15,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            formatAdvisoryDate(
+                              advisory['created_at'],
+                            ),
+                            style: const TextStyle(
+                              color: mutedText,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // VESSEL DETAILS PAGE
